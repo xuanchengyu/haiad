@@ -22,6 +22,8 @@ import numpy as np
 import io
 from PIL import Image
 
+os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
+
 from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
 from .ai_assistant import chat_with_ai
 
