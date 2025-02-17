@@ -1,0 +1,25 @@
+# video analysis
+moviepy
+scenedetect
+whisperx
+opencv-python
+
+# data processing
+numpy
+Pillow
+
+# AI/OpenAI
+openai
+
+# Web service
+flask
+flask-cors
+pymongo
+python-dotenv
+
+# authentication
+bcrypt
+PyJWT
+
+# document processing
+python-docx

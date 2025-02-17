@@ -26,8 +26,8 @@ from video_analysis import scene_detection, split_video, speech_recognition, gen
 from ai_assistant import chat_with_ai
 
 # MongoDB 配置
-url = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority&appName=haiad"
-client = MongoClient(url, server_api=ServerApi('1'))
+uri = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority&appName=haiad"
+client = MongoClient(uri, server_api=ServerApi('1'))
 db = client['haiad']
 fs = gridfs.GridFS(db)  # 用于存储文件
 
