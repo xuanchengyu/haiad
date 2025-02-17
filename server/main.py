@@ -42,6 +42,10 @@ chat_history_collection = db['chat_history']
 app = Flask(__name__)
 CORS(app)
 
+@app.route("/")
+def home():
+    return {"message": "Flask is running on Render!"}
+
 # 配置常量
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'webm'}
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
