@@ -1098,4 +1098,6 @@ def get_chat_history(current_user):
         return jsonify({'error': f'Failed to get chat history: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001, host='0.0.0.0')
+    # 使用环境变量中的端口，如果没有则默认使用 5001
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port)
