@@ -5,7 +5,7 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import axios from 'axios'
 
-axios.defaults.baseURL = process.env.VUE_APP_API_URL || 'https://haiad.onrender.com'
+axios.defaults.baseURL = process.env.VUE_APP_API_URL || 'https://haiad-backend.onrender.com'  // 改为你的后端服务地址
 
 // 添加请求拦截器
 axios.interceptors.request.use(

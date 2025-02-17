@@ -12,10 +12,7 @@ PyJWT
 
 # video processing
 moviepy
-imageio-ffmpeg 
-decorator      
-proglog        
-tqdm
+imageio-ffmpeg
 scenedetect
 whisperx
 

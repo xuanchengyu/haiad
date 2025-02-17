@@ -1,4 +1,4 @@
-from moviepy.editor import VideoFileClip
+from moviepy.video.io. VideoFileClip import VideoFileClip
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from scenedetect import SceneManager, ContentDetector, open_video
 import whisperx
