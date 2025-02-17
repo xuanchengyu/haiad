@@ -13,7 +13,7 @@ PyJWT==2.3.0
 # video processing
 moviepy==1.0.3
 scenedetect==0.6.1
-whisperx==3.0.0
+whisperx==3.3.0
 
 # data processing
 numpy==1.21.2
