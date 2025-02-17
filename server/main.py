@@ -22,8 +22,8 @@ import numpy as np
 import io
 from PIL import Image
 
-from video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
-from ai_assistant import chat_with_ai
+from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
+from .ai_assistant import chat_with_ai
 
 # MongoDB 配置
 uri = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority&appName=haiad"
