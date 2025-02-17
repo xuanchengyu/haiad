@@ -180,7 +180,15 @@ def upload_video(current_user):
                 content_type=file.content_type,
                 user_id=ObjectId(current_user['_id'])  # 添加用户ID作为元数据
             )
-            
+
+            if not isinstance(file_id, ObjectId):
+                return jsonify({'error': 'Invalid file ID from GridFS'}), 500
+
+            chunks_count = db.fs.chunks.count_documents({"files_id": file_id})
+            if chunks_count == 0:
+                fs.delete(file_id)  # **删除无效 `file_id`**
+                return jsonify({'error': 'GridFS 存储失败，文件未分块存储'}), 500
+
             # 创建视频记录
             video_id = videos_collection.insert_one({
                 'user_id': ObjectId(current_user['_id']),
@@ -188,7 +196,7 @@ def upload_video(current_user):
                 'original_filename': file.filename,
                 'created_at': datetime.now(),
                 'has_script': False,
-                'file_id': file_id  # 存储 GridFS 文件ID
+                'file_id': file_id  # GridFS ID
             }).inserted_id
             
             # 生成并保存缩略图
