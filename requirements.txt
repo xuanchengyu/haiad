@@ -1,6 +1,7 @@
 # basic web framework
 flask
 flask-cors
+gunicorn
 
 # database
 pymongo
