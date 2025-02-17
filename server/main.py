@@ -59,6 +59,10 @@ class MongoJSONEncoder(json.JSONEncoder):
 # 配置 Flask 使用自定义 JSON 编码器
 app.json_encoder = MongoJSONEncoder
 
+@app.route("/")
+def home():
+    return {"message": "Flask is running with Gunicorn on Render!"}
+
 # 添加token验证装饰器
 def token_required(f):
     @wraps(f)
@@ -1096,8 +1100,3 @@ def get_chat_history(current_user):
     except Exception as e:
         print(f"Get chat history error: {str(e)}")
         return jsonify({'error': f'Failed to get chat history: {str(e)}'}), 500
-
-# if __name__ == '__main__':
-#     # 使用环境变量中的端口，如果没有则默认使用 5001
-#     port = int(os.environ.get('PORT', 5001))
-#     app.run(host='0.0.0.0', port=port)
