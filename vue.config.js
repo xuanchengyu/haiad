@@ -5,7 +5,7 @@ module.exports = defineConfig({
   devServer: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        target: 'https://haiad.onrender.com',
         changeOrigin: true,
         ws: true
       }
