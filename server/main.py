@@ -5,7 +5,8 @@ import tempfile
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from bson import ObjectId
-from pymongo import MongoClient
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 import gridfs
 from docx import Document
 from io import BytesIO
@@ -25,7 +26,8 @@ from video_analysis import scene_detection, split_video, speech_recognition, gen
 from ai_assistant import chat_with_ai
 
 # MongoDB 配置
-client = MongoClient('mongodb://127.0.0.1:27017')
+uri = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority&appName=haiad"
+client = MongoClient(uri, server_api=ServerApi('1'))
 db = client['haiad']
 fs = gridfs.GridFS(db)  # 用于存储文件
 
