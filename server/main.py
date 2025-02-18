@@ -3,7 +3,7 @@ from flask_cors import CORS
 import os
 import tempfile
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, UTC
 from bson import ObjectId
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
@@ -21,11 +21,13 @@ import numpy as np
 import io
 from PIL import Image
 import requests
+from base64 import b64decode
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
 
 from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
 from .ai_assistant import chat_with_ai
+from .toggle_chat import handle_scene_chat
 
 # cloudinary
 import cloudinary
@@ -52,13 +54,14 @@ human_scripts_collection = db['human_scripts']  # 人工模式脚本
 users_collection = db['users']  # 使用users集合
 users_collection.create_index('username', unique=True) # 创建用户名索引确保唯一性
 chat_history_collection = db['chat_history']
+scene_chat_history_collection = db['scene_chat_history']
 
 app = Flask(__name__)
 CORS(app)
 
 # 配置常量
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'webm'}
-MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB in bytes
+MAX_CONTENT_LENGTH = 1024 * 1024 * 1024  # 1GB in bytes
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 
@@ -73,6 +76,7 @@ class MongoJSONEncoder(json.JSONEncoder):
 
 # 配置 Flask 使用自定义 JSON 编码器
 app.json_encoder = MongoJSONEncoder
+
 
 @app.route("/")
 def home():
@@ -200,6 +204,17 @@ def upload_video(current_user):
         if file.filename == '':
             return jsonify({'error': '没有选择文件'}), 400
             
+        # 检查文件大小
+        file.seek(0, 2)  # 移动到文件末尾
+        size = file.tell()  # 获取文件大小
+        file.seek(0)  # 重置文件指针
+        
+        if size > MAX_CONTENT_LENGTH:
+            return jsonify({
+                'success': False,
+                'error': f'File too large. Maximum size is {MAX_CONTENT_LENGTH/(1024*1024)}MB'
+            }), 413
+
         if file and allowed_file(file.filename):
             # 确保文件名不会重复.mp4
             filename = secure_filename(file.filename)
@@ -647,60 +662,70 @@ def add_scene(current_user, video_id):
         print(f"添加场景时出错: {str(e)}")
         return jsonify({'error': f'添加场景失败: {str(e)}'}), 500
 
-# 更新指定场景
+# 获取和更新指定场景
 @app.route('/api/videos/<video_id>/scenes/<scene_id>', methods=['PUT'])
 @token_required
-def update_scene(current_user, video_id, scene_id):
+def handle_scene(current_user, video_id, scene_id):
     try:
         data = request.json
-        
-        # 添加日志以便调试
-        # print(f"更新场景数据: {data}")
-        # print(f"video_id: {video_id}, scene_id: {scene_id}")
-        
-        # 验证数据完整性
-        if not all(key in data for key in ['scene_number', 'start_time', 'end_time', 'description']):
-            return jsonify({'error': '缺少必要字段'}), 400
-        
+            
+        # 首先获取完整的脚本文档
+        script = scripts_collection.find_one({
+            'video_id': ObjectId(video_id),
+            'user_id': ObjectId(current_user['_id'])
+        })
+            
+        if not script:
+            print("未找到对应的脚本")
+            return jsonify({'error': '未找到对应的脚本'}), 404
+            
+        # 找到需要更新的场景在数组中的索引
+        scene_index = None
+        for i, scene in enumerate(script['scenes']):
+            if str(scene['_id']) == scene_id:
+                scene_index = i
+                break
+            
+        if scene_index is None:
+            print("未找到对应的场景")
+            return jsonify({'error': '未找到对应的场景'}), 404
+            
+        # 构建更新操作
         update_query = {
             'video_id': ObjectId(video_id),
-            'user_id': ObjectId(current_user['_id']),
-            'scenes._id': ObjectId(scene_id)
+            'user_id': ObjectId(current_user['_id'])
         }
-        
+            
+        # 使用数组索引直接更新指定场景
         update_operation = {
             '$set': {
-                'scenes.$.scene_number': data.get('scene_number', ''),
-                'scenes.$.start_time': data.get('start_time', '00:00:00.000'),
-                'scenes.$.end_time': data.get('end_time', '00:00:00.000'),
-                'scenes.$.description': data.get('description', ''),
-                'updated_at': datetime.now()  # 添加更新时间
+                f'scenes.{scene_index}.scene_number': data.get('scene_number', ''),
+                f'scenes.{scene_index}.start_time': data.get('start_time', '00:00:00.000'),
+                f'scenes.{scene_index}.end_time': data.get('end_time', '00:00:00.000'),
+                f'scenes.{scene_index}.description': data.get('description', ''),
+                'updated_at': datetime.now(UTC)
             }
         }
-        
-        # 添加日志以便调试
-        # print(f"更新查询: {update_query}")
-        # print(f"更新操作: {update_operation}")
-        
-        result = scripts_collection.update_one(update_query, update_operation)
-        
-        if result.matched_count == 0:
-            return jsonify({'error': '未找到指定场景或无权访问'}), 404
             
+        result = scripts_collection.update_one(update_query, update_operation)
+
+        if result.matched_count == 0:
+            return jsonify({'error': '更新失败，未找到匹配文档'}), 404
+                
         if result.modified_count > 0:
             return jsonify({
                 'success': True,
                 'message': '场景更新成功'
             })
-            
+                
         return jsonify({
             'success': False,
             'message': '场景未发生变化'
         })
-        
+            
     except Exception as e:
         print(f"更新场景时出错: {str(e)}")
-        traceback.print_exc()  # 添加详细的错误追踪
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': f'更新场景失败: {str(e)}'
@@ -1086,58 +1111,71 @@ def get_human_script(current_user, video_id):
 
 @app.route('/api/chat', methods=['POST'])
 @token_required
-def chat_endpoint(current_user):
+def chat(current_user):
     try:
-        data = request.json
-        message = data.get('message', '')
-        image_data = data.get('image')
-        
-        # 添加日志以便调试
-        print(f"Received request - message: {message[:100]}...")  # 只打印前100个字符
-        
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        image_data = data.get('image')  # Base64 图片数据
+
         if not message and not image_data:
-            return jsonify({'error': 'Message or image is required'}), 400
+            return jsonify({
+                'success': False,
+                'error': 'Message or image is required'
+            }), 400
 
-        # 获取用户的最近历史对话（最近10条对话）
-        try:
-            chat_history = list(chat_history_collection.find(
-                {'user_id': ObjectId(current_user['_id'])}
-            ).sort('created_at', -1).limit(10))
-        except Exception as db_error:
-            print(f"Database error: {str(db_error)}")
-            chat_history = []
+        # 处理图片上传
+        image_url = None
+        if image_data:
+            try:
+                # 从 Base64 中提取实际的图片数据
+                image_data = image_data.split(',')[1] if ',' in image_data else image_data
+                image_bytes = b64decode(image_data)
+                
+                # 上传到 Cloudinary
+                upload_result = cloudinary.uploader.upload(
+                    io.BytesIO(image_bytes),
+                    folder=f"users/{str(current_user['_id'])}/chat_images",
+                    public_id=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_chat_image",
+                    resource_type="auto",
+                    overwrite=True
+                )
+                image_url = upload_result['secure_url']
+                print(f"Image uploaded to: {image_url}")
+                
+            except Exception as e:
+                print(f"Error uploading image: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Image upload failed: {str(e)}'
+                }), 500
 
-        # 构建历史消息列表（每条对话最多包含前后4轮对话）
+        # 保持原有的消息处理逻辑...
         history_messages = []
         message_count = 0
-        MAX_HISTORY_MESSAGES = 8  # 限制历史消息数量
+        MAX_MESSAGES = 10
 
-        try:
-            for chat in reversed(chat_history):  # 反转顺序以保持时间顺序
-                for msg in chat['messages']:
-                    if message_count >= MAX_HISTORY_MESSAGES:
-                        break
-                        
-                    # 只添加文本内容，不包含图片以节省 tokens
-                    content = msg.get('content', '')
-                    if isinstance(content, list):  # 处理包含图片的消息
-                        content = next((item.get('text', '') for item in content if item.get('type') == 'text'), '')
+        chat_history = db.chat_history.find({
+            'user_id': ObjectId(current_user['_id'])
+        }).sort('created_at', -1).limit(MAX_MESSAGES)
 
-                    history_messages.append({
-                        'role': msg.get('role', 'user'),
-                        'content': content
-                    })
-                    message_count += 1
-                
-                if message_count >= MAX_HISTORY_MESSAGES:
+        for chat in chat_history:
+            for msg in reversed(chat.get('messages', [])):
+                if message_count >= MAX_MESSAGES:
                     break
-        except Exception as history_error:
-            print(f"History processing error: {str(history_error)}")
-            history_messages = []
+                    
+                content = msg.get('content', '')
+                if isinstance(content, list):
+                    content = next((item.get('text', '') for item in content if item.get('type') == 'text'), '')
+
+                history_messages.append({
+                    'role': msg.get('role', 'user'),
+                    'content': content
+                })
+                message_count += 1
 
         # 调用 AI 助手，传入有限的历史记录
         try:
-            result = chat_with_ai(message, image_data, history_messages)
+            result = chat_with_ai(message, image_url, history_messages)
             
             if not result.get('success'):
                 print(f"AI assistant error: {result.get('error')}")
@@ -1150,7 +1188,7 @@ def chat_endpoint(current_user):
                     {
                         'role': 'user',
                         'content': message,
-                        'image': image_data,
+                        'image': image_url,
                         'timestamp': datetime.now()
                     },
                     {
@@ -1191,14 +1229,36 @@ def chat_endpoint(current_user):
 def get_chat_history(current_user):
     try:
         # 获取用户的聊天历史
-        history = list(chat_history_collection.find(
+        history = list(db.chat_history.find(
             {'user_id': ObjectId(current_user['_id'])}
         ).sort('created_at', -1))  # 按时间倒序排列
         
-        # 处理 ObjectId 为字符串
+        # 处理 ObjectId 和时间戳
         for chat in history:
+            # 转换所有 ObjectId 字段为字符串
             chat['_id'] = str(chat['_id'])
             chat['user_id'] = str(chat['user_id'])
+            if 'video_id' in chat:
+                chat['video_id'] = str(chat['video_id'])
+            if 'scene_id' in chat:
+                chat['scene_id'] = str(chat['scene_id'])
+            
+            # 转换时间戳
+            if 'created_at' in chat:
+                chat['created_at'] = chat['created_at'].isoformat()
+            
+            # 处理消息中的时间戳
+            for message in chat.get('messages', []):
+                if 'timestamp' in message:
+                    message['timestamp'] = message['timestamp'].isoformat()
+                
+                # 确保消息内容是可序列化的
+                if isinstance(message.get('content'), list):
+                    for item in message['content']:
+                        if '_id' in item:
+                            item['_id'] = str(item['_id'])
+        
+        print("Processed chat history:", history)  # 添加调试日志
         
         return jsonify({
             'success': True,
@@ -1207,7 +1267,159 @@ def get_chat_history(current_user):
         
     except Exception as e:
         print(f"Get chat history error: {str(e)}")
-        return jsonify({'error': f'Failed to get chat history: {str(e)}'}), 500
+        return jsonify({
+            'success': False,
+            'error': f'Failed to get chat history: {str(e)}'
+        }), 500
+
+@app.route('/api/ai/scene/chat', methods=['POST'])
+@token_required
+def scene_ai_chat(current_user):
+    try:
+        data = request.get_json()
+        print("Received request data:", data)
+        
+        # 验证必要的参数
+        if not all([data.get('video_id'), data.get('scene_id'), data.get('current_text'), data.get('user_message')]):
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters'
+            }), 400
+            
+        try:
+            # 查找现有的聊天历史
+            chat_history = db.chat_history.find_one({
+                'user_id': ObjectId(current_user['_id']),
+                'video_id': ObjectId(data.get('video_id')),
+                'scene_id': ObjectId(data.get('scene_id'))
+            })
+            
+            # 获取历史消息
+            chat_histories = chat_history.get('messages', []) if chat_history is not None else []
+            
+            # 调用 OpenAI 处理函数
+            result = handle_scene_chat(
+                current_text=data.get('current_text'),
+                user_message=data.get('user_message'),
+                chat_histories=chat_histories
+            )
+            
+            if result['success']:
+                # 准备新的消息
+                new_messages = [
+                    {
+                        'role': 'user',
+                        'content': data.get('user_message'),
+                        'timestamp': datetime.now(UTC)
+                    },
+                    {
+                        'role': 'assistant',
+                        'content': result['message'],
+                        'timestamp': datetime.now(UTC)
+                    }
+                ]
+                
+                if chat_history is not None:
+                    # 更新现有对话
+                    db.scene_chat_history.update_one(
+                        {'_id': chat_history['_id']},
+                        {
+                            '$push': {
+                                'messages': {
+                                    '$each': new_messages
+                                }
+                            }
+                        }
+                    )
+                else:
+                    # 创建新对话
+                    chat_entry = {
+                        'user_id': ObjectId(current_user['_id']),
+                        'video_id': ObjectId(data.get('video_id')),
+                        'scene_id': ObjectId(data.get('scene_id')),
+                        'messages': new_messages,
+                        'created_at': datetime.now(UTC)
+                    }
+                    db.scene_chat_history.insert_one(chat_entry)
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            print(f"Database or processing error: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Database or processing error: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        print(f"Request parsing error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Request parsing error: {str(e)}'
+        }), 500
+
+@app.route('/api/ai/scene/chat/history', methods=['GET'])
+@token_required
+def get_scene_chat_history(current_user):
+    try:
+        # 获取请求参数
+        video_id = request.args.get('video_id')
+        scene_id = request.args.get('scene_id')
+        
+        # 验证必要的参数
+        if not all([video_id, scene_id]):
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters'
+            }), 400
+            
+        try:
+            # 查找聊天历史
+            chat_history = db.scene_chat_history.find_one({
+                'user_id': ObjectId(current_user['_id']),
+                'video_id': ObjectId(video_id),
+                'scene_id': ObjectId(scene_id)
+            })
+            
+            if chat_history:
+                # 转换 ObjectId 为字符串
+                chat_history['_id'] = str(chat_history['_id'])
+                chat_history['user_id'] = str(chat_history['user_id'])
+                chat_history['video_id'] = str(chat_history['video_id'])
+                chat_history['scene_id'] = str(chat_history['scene_id'])
+                
+                # 转换消息中的时间戳
+                for message in chat_history['messages']:
+                    if 'timestamp' in message:
+                        message['timestamp'] = message['timestamp'].isoformat()
+                
+                # 转换创建时间
+                if 'created_at' in chat_history:
+                    chat_history['created_at'] = chat_history['created_at'].isoformat()
+                
+                return jsonify({
+                    'success': True,
+                    'history': chat_history
+                })
+            else:
+                return jsonify({
+                    'success': True,
+                    'history': None
+                })
+            
+        except Exception as e:
+            print(f"Database error: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Database error: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        print(f"Request parsing error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Request parsing error: {str(e)}'
+        }), 500
 
 # if __name__ == '__main__':
 #     port = int(os.environ.get('PORT', 5002))

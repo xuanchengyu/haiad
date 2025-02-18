@@ -45,6 +45,7 @@
           <script-editor
             :video-id="videoId"
             :script-data="scenes"
+            mode="collaborative"
             @update:script="updateScript"
             @seek="handleSeek"
           />
@@ -58,7 +59,7 @@
   </template>
   
   <script>
-  import axios from 'axios'
+  import axios from '@/main'
   import VideoPlayer from '@/components/VideoPlayer.vue'
   import ScriptEditor from '@/components/ScriptEditor.vue'
   import AiAssistant from '@/components/AiAssistant.vue'
@@ -73,7 +74,7 @@
     },
     data() {
       return {
-        videoId: '',
+        videoId: this.$route.params.id,
         scenes: [],
         script: '',
         isGenerating: false,
@@ -85,7 +86,6 @@
       }
     },
     async created() {
-      this.videoId = this.$route.params.id;
       await this.loadVideoData();
       await this.loadScript();
     },
@@ -124,14 +124,6 @@
 
           if (response.data && response.data.scenes) {
             this.scenes = response.data.scenes;
-            const scriptResponse = await axios.get(`/api/initial-script`, {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
-            if (scriptResponse.data && scriptResponse.data.success) {
-              this.script = scriptResponse.data.script || '';
-            }
           }
         } catch (error) {
           if (error.response?.status === 401) {
@@ -186,10 +178,6 @@
       updateScript(newScenes) {
         this.scenes = newScenes;
         this.hasUnsavedChanges = true;
-      },
-      applySuggestion(suggestion) {
-        this.script = suggestion;
-        ElMessage.success('AI suggestion applied successfully!');
       },
       async downloadScript() {
         try {
@@ -255,7 +243,7 @@
         if (this.$refs.videoPlayer) {
           this.$refs.videoPlayer.seekTo(timeStr);
         }
-      }
+      },
     }
   }
   </script>

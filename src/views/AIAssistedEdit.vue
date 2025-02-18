@@ -45,6 +45,7 @@
         <script-editor
           :video-id="videoId"
           :script-data="scenes"
+          mode="ai-assisted"
           @update:script="updateScript"
           @seek="handleSeek"
         />
@@ -54,7 +55,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import axios from '@/main'
 import VideoPlayer from '@/components/VideoPlayer.vue'
 import ScriptEditor from '@/components/ScriptEditor.vue'
 //import AiChatBox from '@/components/AiAssistant.vue'
@@ -68,7 +69,7 @@ export default {
   },
   data() {
     return {
-      videoId: '',
+      videoId: this.$route.params.id,
       scenes: [],
       script: '',
       isGenerating: false,
@@ -80,7 +81,6 @@ export default {
     }
   },
   async created() {
-    this.videoId = this.$route.params.id;
     await this.loadScript();
     await this.loadVideoData();
   },
@@ -101,14 +101,6 @@ export default {
 
         if (response.data && response.data.scenes) {
           this.scenes = response.data.scenes;
-          const scriptResponse = await axios.get(`/api/initial-script`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          if (scriptResponse.data && scriptResponse.data.success) {
-            this.script = scriptResponse.data.script || '';
-          }
         }
       } catch (error) {
         if (error.response?.status === 401) {

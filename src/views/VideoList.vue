@@ -93,7 +93,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import axios from '@/main';
 import NavBar from '@/components/NavBar.vue'
 import { ElMessage } from 'element-plus';
 

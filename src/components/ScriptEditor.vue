@@ -35,15 +35,23 @@
             <button @click="addScene(scene._id, 'after')" class="control-btn" title="Add Scene Below">
               <span class="material-icons">arrow_downward</span>
             </button>
+            <ToggleChat 
+              mode="collaborative"
+              :video-id="videoId"
+              :scene-id="scene._id"
+              :current-text="scene.description"
+            />
           </div>
         </div>
 
-        <textarea
-          v-model="scene.description"
-          class="scene-description"
-          :placeholder="'Edit your script here...'"
-          @focus="$emit('seek', scene.start_time)"
-        ></textarea>
+        <div class="scene-content">
+          <textarea
+            v-model="scene.description"
+            class="scene-description"
+            :placeholder="'Edit your script here...'"
+            @focus="$emit('seek', scene.start_time)"
+          ></textarea>
+        </div>
         
         <div class="speech-rate">
           <span>Speech Rate: {{ calculateSpeechRate(scene) }} WPM</span>
@@ -54,11 +62,15 @@
 </template>
 
 <script>
-import axios from 'axios';
+import axios from '@/main';
 import { ElMessage } from 'element-plus';
+import ToggleChat from './ToggleChat.vue';
 
 export default {
   name: 'ScriptEditor',
+  components: {
+    ToggleChat
+  },
   props: {
     scriptData: {
       type: Array,
@@ -67,6 +79,11 @@ export default {
     videoId: {
       type: String,
       required: true
+    },
+    mode: {
+      type: String,
+      required: true,
+      validator: value => ['collaborative', 'ai-assisted'].includes(value)
     }
   },
   data() {
@@ -76,6 +93,12 @@ export default {
       error: null
     }
   },
+  // mounted() {
+  //   console.log('ScriptEditor mounted with:', {
+  //     videoId: this.videoId,
+  //     scenes: this.scenes
+  //   });
+  // },
   methods: {
     parseTime(timeStr) {
       if (!timeStr) return 0;
@@ -223,6 +246,41 @@ export default {
           ElMessage.error(error.response?.data?.error || '删除场景失败');
         }
       }
+    },
+
+    async handleAIChat(scene, userMessage) {
+      try {
+        console.log('处理 AI 聊天:', {
+          scene,
+          userMessage
+        });
+        
+        if (!scene || !scene._id) {
+          throw new Error('无效的场景数据');
+        }
+
+        const response = await axios.post('/api/ai/scene/chat', {
+          video_id: this.videoId,
+          scene_id: scene._id,
+          current_text: scene.description,
+          user_message: userMessage
+        }, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (response.data.success) {
+          return response.data.chat_history;
+        } else {
+          const errorMsg = response.data.error || 'AI 处理失败';
+          console.error('AI 处理失败:', errorMsg);
+          ElMessage.error(errorMsg);
+        }
+      } catch (error) {
+        console.error('AI 聊天失败:', error);
+        ElMessage.error(error.message || 'AI 聊天失败');
+      }
     }
   },
   watch: {
@@ -243,10 +301,11 @@ export default {
 
 <style scoped>
 .script-editor {
+  position: relative;
+  overflow: visible;
   width: 100%;
   height: 100%;
   padding: 20px;
-  overflow-y: auto;
 }
 
 .scenes-container {
@@ -289,7 +348,14 @@ export default {
   color: #666;
 }
 
+.scene-content {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
 .scene-description {
+  flex: 1;
   width: 100%;
   min-height: 100px;
   padding: 10px;
@@ -306,8 +372,11 @@ export default {
 }
 
 .scene-controls {
+  position: relative;
+  overflow: visible;
   display: flex;
   gap: 5px;
+  align-items: center;
 }
 
 .control-btn {
@@ -323,10 +392,6 @@ export default {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-}
-
-.material-icons {
-  font-size: 18px;
 }
 
 /* 删除按钮 */
@@ -349,6 +414,10 @@ export default {
   background-color: #e3f2fd;
   color: #2196f3;
   border-color: #2196f3;
+}
+
+.material-icons {
+  font-size: 18px;
 }
 
 .loading, .error {

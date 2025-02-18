@@ -4,13 +4,13 @@ import os
 
 client = OpenAI(api_key="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")
 
-def chat_with_ai(message, image_data=None, history=None):
+def chat_with_ai(message, image_url=None, history=None):
     try:
         # 构建系统提示，专注于专业的音频描述并支持多种指南
         system_message = {
             "role": "system",
             "content": (
-                "You are a professional AI assistant specializing in writing and refining audio descriptions (AD) "
+                "You are a professional AI assistant specialising in writing and refining audio descriptions (AD) "
                 "for film and television. Your goal is to create clear, concise, and accurate AD that enhances "
                 "accessibility for blind and visually impaired audiences.\n\n"
                 
@@ -38,10 +38,7 @@ def chat_with_ai(message, image_data=None, history=None):
                 })
         
         # 添加当前消息
-        if image_data:
-            # 处理图片，将base64转换为OpenAI需要的格式
-            base64_image = image_data.split(',')[1] if ',' in image_data else image_data
-            
+        if image_url:
             messages.append({
                 "role": "user",
                 "content": [
@@ -52,7 +49,7 @@ def chat_with_ai(message, image_data=None, history=None):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}"
+                            "url": image_url
                         }
                     }
                 ]
