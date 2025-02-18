@@ -2,6 +2,7 @@
 flask
 flask-cors
 gunicorn
+cloudinary
 
 # database
 pymongo

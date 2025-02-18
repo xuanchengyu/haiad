@@ -3,6 +3,7 @@
     <video
       ref="videoRef"
       class="video-js vjs-custom-theme"
+      :controls="false"
     ></video>
     <div class="custom-controls" v-if="player">
       <div class="progress-bar" 
@@ -18,8 +19,8 @@
       </div>
       <div class="controls-wrapper">
         <div class="left-controls">
-          <button @click="play" class="control-button play-pause-button">
-            <span v-if="player.paused()">⏵</span>
+          <button @click="togglePlay" class="control-button play-pause-button">
+            <span v-if="!isPlaying">⏵</span>
             <span v-else>⏸</span>
           </button>
           <button @click="skipBackward(1)" class="control-button">≪</button>
@@ -42,12 +43,13 @@
 <script>
 // 使用 import 导入，如果报错可以改用 require
 import videojs from 'video.js';
+import '@videojs/http-streaming';
 import 'video.js/dist/video-js.css';
 
 export default {
   name: 'VideoPlayer',
   props: {
-    videoId: {
+    videoUrl: {
       type: String,
       required: true
     }
@@ -55,20 +57,98 @@ export default {
   data() {
     return {
       player: null,
-      videoUrl: '',
-      currentTimeFormatted: '00:00:00.000',
-      durationFormatted: '00:00:00.000',
+      isPlaying: false,
       isFullscreen: false,
       progress: 0,
+      currentTimeFormatted: '00:00:00.000',
+      durationFormatted: '00:00:00.000',
       showSeekPreview: false,
       seekPreviewPosition: 0,
       seekPreviewTime: '00:00:00.000',
-      animationFrameId: null,
-      isVideoReady: false,
-      isPlayerReady: false
+      animationFrameId: null
+    }
+  },
+  computed: {
+    videoType() {
+      // 检查是否是 MP4
+      if (this.videoUrl?.includes('.mp4')) {
+        return 'video/mp4';
+      }
+      return '';
     }
   },
   methods: {
+    initializePlayer() {
+      if (!this.videoUrl) {
+        console.error('视频 URL 不存在');
+        return;
+      }
+
+      try {
+        if (this.player) {
+          this.player.dispose();
+        }
+
+        const options = {
+          sources: [{
+            src: this.videoUrl,
+            type: this.videoType
+          }],
+          fluid: true,
+          controls: false,
+          preload: 'auto'
+        };
+
+        this.player = videojs(this.$refs.videoRef, options, () => {
+          console.log('播放器初始化完成');
+          this.setupEventListeners();
+          this.startProgressUpdate();
+        });
+      } catch (error) {
+        console.error('播放器初始化失败:', error);
+      }
+    },
+
+    setupEventListeners() {
+      this.player.on('play', () => this.isPlaying = true);
+      this.player.on('pause', () => this.isPlaying = false);
+      this.player.on('timeupdate', () => this.updateTimeDisplay());
+      this.player.on('durationchange', () => this.updateTimeDisplay());
+      
+      // 监听全屏变化
+      document.addEventListener('fullscreenchange', this.handleFullscreenChange);
+    },
+
+    togglePlay() {
+      if (this.isPlaying) {
+        this.player.pause();
+      } else {
+        this.player.play();
+      }
+    },
+
+    skipForward(seconds) {
+      const newTime = Math.min(this.player.duration(), this.player.currentTime() + seconds);
+      this.player.currentTime(newTime);
+    },
+
+    skipBackward(seconds) {
+      const newTime = Math.max(0, this.player.currentTime() - seconds);
+      this.player.currentTime(newTime);
+    },
+
+    toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        this.$el.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    },
+
+    handleFullscreenChange() {
+      this.isFullscreen = !!document.fullscreenElement;
+    },
+
     formatTime(seconds) {
       if (!seconds) return '00:00:00.000';
       
@@ -86,62 +166,11 @@ export default {
     },
 
     updateTimeDisplay() {
-      if (this.player && this.isPlayerReady && this.isVideoReady) {
-        try {
-          const currentTime = this.player.currentTime() || 0;
-          const duration = this.player.duration() || 0;
-          this.currentTimeFormatted = this.formatTime(currentTime);
-          this.durationFormatted = this.formatTime(duration);
-        } catch (error) {
-          console.warn('更新时间显示失败:', error);
-        }
-      }
-    },
-
-    play() {
-      if (this.player.paused()) {
-        this.player.play();
-      } else {
-        this.player.pause();
-      }
-    },
-
-    skipForward(seconds) {
-      const newTime = Math.min(this.player.duration(), this.player.currentTime() + seconds);
-      this.player.currentTime(newTime);
-    },
-
-    skipBackward(seconds) {
-      const newTime = Math.max(0, this.player.currentTime() - seconds);
-      this.player.currentTime(newTime);
-    },
-
-    toggleFullscreen() {
-      if (!document.fullscreenElement) {
-        this.$el.requestFullscreen();
-        this.isFullscreen = true;
-      } else {
-        document.exitFullscreen();
-        this.isFullscreen = false;
-      }
-    },
-
-    handleKeydown(event) {
-      if (event.key === 'Escape' && this.isFullscreen) {
-        this.isFullscreen = false;
-      }
-    },
-
-    updateProgress() {
-      if (this.player && this.isPlayerReady && this.isVideoReady) {
-        try {
-          const duration = this.player.duration() || 0;
-          const currentTime = this.player.currentTime() || 0;
-          this.progress = duration ? (currentTime / duration) * 100 : 0;
-        } catch (error) {
-          console.warn('更新进度失败:', error);
-        }
-      }
+      const currentTime = this.player.currentTime() || 0;
+      const duration = this.player.duration() || 0;
+      this.currentTimeFormatted = this.formatTime(currentTime);
+      this.durationFormatted = this.formatTime(duration);
+      this.progress = (currentTime / duration) * 100;
     },
 
     seek(event) {
@@ -161,138 +190,73 @@ export default {
       this.seekPreviewTime = this.formatTime(previewTime);
     },
 
-    async initializePlayer() {
-      try {
-        // 初始化播放器
-        this.player = videojs(this.$refs.videoRef, {
-          controls: false,
-          fluid: true,
-          preload: 'auto'
-        });
+    startProgressUpdate() {
+      const updateProgress = () => {
+        this.updateTimeDisplay();
+        this.animationFrameId = requestAnimationFrame(updateProgress);
+      };
+      updateProgress();
+    },
 
-        // 等待播放器就绪
-        this.player.ready(() => {
-          this.isPlayerReady = true;
+    parseTime(timeStr) {
+      if (typeof timeStr === 'number') return timeStr;
+      
+      if (!timeStr) return 0;
+      
+      try {
+        const [hours, minutes, seconds] = timeStr.split(':');
+        const [secs, ms] = (seconds || '0.0').split('.');
+        return parseInt(hours || 0) * 3600 + 
+               parseInt(minutes || 0) * 60 + 
+               parseInt(secs || 0) + 
+               parseInt(ms || 0) / 1000;
+      } catch (error) {
+        console.error('时间解析失败:', error);
+        return 0;
+      }
+    },
+
+    seekTo(time) {
+      if (this.player) {
+        try {
+          const parsedTime = this.parseTime(time);
+          console.log('跳转到时间:', parsedTime); // 添加日志
           
-          // 添加视频加载事件监听
-          this.player.on('loadedmetadata', () => {
-            this.isVideoReady = true;
-            this.updateTimeDisplay();
-          });
-
-          // 添加其他事件监听
-          this.player.on('timeupdate', () => {
-            if (this.isVideoReady) {
-              this.updateTimeDisplay();
-            }
-          });
-
-          this.player.on('durationchange', () => {
-            if (this.isVideoReady) {
-              this.updateTimeDisplay();
-            }
-          });
-
-          // 开始进度更新循环
-          const updateProgressLoop = () => {
-            if (this.isVideoReady) {
-              this.updateProgress();
-            }
-            this.animationFrameId = requestAnimationFrame(updateProgressLoop);
-          };
-          updateProgressLoop();
-
-          // 加载视频源
-          this.loadVideoSource();
-        });
-
-      } catch (error) {
-        console.error('初始化播放器失败:', error);
-      }
-    },
-
-    async loadVideoSource() {
-      try {
-        // 获取token
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('未登录');
-        }
-
-        const response = await fetch(`/api/videos/${this.videoId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`  // 添加token到请求头
+          if (isNaN(parsedTime) || !isFinite(parsedTime)) {
+            console.error('无效的时间值:', time);
+            return;
           }
-        });
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            // token无效或过期
-            this.$router.push('/login');
-            throw new Error('请重新登录');
-          }
-          if (response.status === 404) {
-            throw new Error('视频不存在或无权访问');
-          }
-          throw new Error(`加载失败 (${response.status})`);
-        }
-        
-        const blob = await response.blob();
-        if (this.videoUrl) {
-          URL.revokeObjectURL(this.videoUrl);  // 清理旧的URL
-        }
-        this.videoUrl = URL.createObjectURL(blob);
-
-        if (this.player && this.isPlayerReady) {
-          this.player.src({
-            type: response.headers.get('Content-Type') || 'video/mp4',
-            src: this.videoUrl
-          });
-          this.player.load();
-        }
-      } catch (error) {
-        console.error('加载视频源失败:', error);
-        // 可以添加错误提示
-        if (this.$notify) {
-          this.$notify({
-            type: 'error',
-            message: error.message || '加载视频失败'
-          });
+          const duration = this.player.duration();
+          const targetTime = Math.max(0, Math.min(parsedTime, duration));
+          this.player.currentTime(targetTime);
+        } catch (error) {
+          console.error('跳转到指定时间失败:', error);
         }
       }
     },
 
-    // 添加 seekTo 方法，处理 HH:MM:SS.mmmm 格式
-    seekTo(timeStr) {
-      try {
-        if (!this.player || !this.isPlayerReady || !this.isVideoReady) return;
-        
-        // 处理 HH:MM:SS.mmmm 格式
-        const [time, ms] = timeStr.split('.');
-        const [hours, minutes, seconds] = time.split(':').map(Number);
-        
-        // 计算总秒数，毫秒部分除以 10000 转换为秒
-        const totalSeconds = hours * 3600 + minutes * 60 + seconds + (parseInt(ms || 0) / 10000);
-        
-        this.player.currentTime(totalSeconds);
-      } catch (error) {
-        console.error('Error seeking to time:', error);
-      }
+    getCurrentTime() {
+      return this.player ? this.player.currentTime() : 0;
     }
   },
-  mounted() {
-    this.initializePlayer();
+  watch: {
+    videoUrl: {
+      handler(newUrl) {
+        if (newUrl) {
+          this.initializePlayer();
+        }
+      },
+      immediate: true
+    }
   },
   beforeUnmount() {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
     if (this.player) {
-      if (this.animationFrameId) {
-        cancelAnimationFrame(this.animationFrameId);
-      }
-      
       this.player.dispose();
-      if (this.videoUrl) {
-        URL.revokeObjectURL(this.videoUrl);
-      }
     }
   }
 }

@@ -59,14 +59,10 @@
                @click="goToEdit(video.id)">
             <div class="video-thumbnail">
               <img 
-                v-if="video.thumbnail_url" 
-                :src="video.thumbnail_url" 
+                :src="video.thumbnail_url || defaultThumbnail" 
                 :alt="video.original_filename"
-                class="thumbnail-img"
+                @error="onThumbnailError"
               />
-              <div v-else class="thumbnail-placeholder">
-                <i class="fas fa-video"></i>
-              </div>
             </div>
             <div class="video-info">
               <h3>{{ video.original_filename }}</h3>
@@ -81,6 +77,14 @@
                 </span>
               </div>
             </div>
+            <div class="video-actions">
+              <button 
+                @click.stop="deleteVideo(video.id)" 
+                class="delete-btn"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -91,6 +95,7 @@
 <script>
 import axios from 'axios';
 import NavBar from '@/components/NavBar.vue'
+import { ElMessage } from 'element-plus';
 
 export default {
   name: 'VideoList',
@@ -101,10 +106,11 @@ export default {
     return {
       videos: [],
       selectedFile: null,
-      loading: false,
+      loading: true,
       error: null,
       isUploading: false,
-      isDragging: false
+      isDragging: false,
+      defaultThumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIzMjAiIGhlaWdodD0iMTgwIiBmaWxsPSIjZjBmMGYwIi8+CiAgICA8Y2lyY2xlIGN4PSIxNjAiIGN5PSI5MCIgcj0iNDAiIGZpbGw9IiNkZGQiLz4KICAgIDxwYXRoIGQ9Ik0xNDUgNzBMMTg1IDkwTDE0NSAxMTBaIiBmaWxsPSIjZmZmIi8+CiAgICA8dGV4dCB4PSIxNjAiIHk9IjE0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiIgZm9udC1zaXplPSIxNCI+5peg57uY5Yi2PC90ZXh0Pgo8L3N2Zz4='
     }
   },
   created() {
@@ -211,7 +217,9 @@ export default {
       }
     },
     goToEdit(videoId) {
-      this.$router.push(`/mode-select/${videoId}`);
+      if (!this.isDeleting) {
+        this.$router.push(`/mode-select/${videoId}`);
+      }
     },
     formatDate(dateString) {
       return new Date(dateString).toLocaleString('en-GB', {
@@ -222,6 +230,46 @@ export default {
         minute: '2-digit'
       });
     },
+    async deleteVideo(videoId) {
+      try {
+        const response = await axios.delete(`/api/videos/${videoId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (response.data.success) {
+          ElMessage.success('视频删除成功');
+          await this.fetchVideos();
+        } else {
+          ElMessage.error(response.data.error || '删除失败');
+        }
+      } catch (error) {
+        console.error('删除视频失败:', error);
+        ElMessage.error(error.response?.data?.error || '删除视频失败');
+      }
+    },
+
+    // async loadVideos() {
+    //   try {
+    //     const response = await axios.get('/api/videos', {
+    //       headers: {
+    //         'Authorization': `Bearer ${localStorage.getItem('token')}`
+    //       }
+    //     });
+
+    //     if (response.data.success) {
+    //       this.videos = response.data.videos;
+    //     }
+    //   } catch (error) {
+    //     console.error('加载视频列表失败:', error);
+    //     ElMessage.error('加载视频列表失败');
+    //   }
+    // },
+    
+    onThumbnailError(event) {
+      event.target.src = this.defaultThumbnail
+    }
   },
   mounted() {
     this.fetchVideos();
@@ -428,5 +476,24 @@ export default {
 
 .error-message {
   color: #dc3545;
+}
+
+.video-actions {
+  padding: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.delete-btn {
+  padding: 5px 10px;
+  background-color: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-btn:hover {
+  background-color: #cc0000;
 }
 </style> 

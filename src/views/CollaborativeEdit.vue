@@ -36,8 +36,8 @@
       <main class="main-content">
         <div class="video-section">
           <video-player 
+            :videoUrl="videoData.video_url"
             ref="videoPlayer"
-            :video-id="videoId"
           />
         </div>
   
@@ -78,14 +78,36 @@
         script: '',
         isGenerating: false,
         isSaving: false,
-        hasUnsavedChanges: false
+        hasUnsavedChanges: false,
+        videoData: {
+          video_url: ''
+        }
       }
     },
     async created() {
       this.videoId = this.$route.params.id;
+      await this.loadVideoData();
       await this.loadScript();
     },
     methods: {
+      async loadVideoData() {
+        try {
+          const response = await axios.get(`/api/videos/${this.videoId}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.data.success) {
+            this.videoData = {
+              video_url: response.data.video_url
+            };
+          }
+        } catch (error) {
+          console.error('加载视频失败:', error);
+          ElMessage.error('加载视频失败');
+        }
+      },
       async loadScript() {
         try {
           const token = localStorage.getItem('token');

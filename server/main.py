@@ -7,7 +7,6 @@ from datetime import datetime
 from bson import ObjectId
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
-import gridfs
 from docx import Document
 from io import BytesIO
 import json
@@ -21,17 +20,30 @@ import cv2
 import numpy as np
 import io
 from PIL import Image
+import requests
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
 
-from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
-from .ai_assistant import chat_with_ai
+from video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
+from ai_assistant import chat_with_ai
 
-# MongoDB 配置
+# cloudinary
+import cloudinary
+import cloudinary.uploader
+from cloudinary.utils import cloudinary_url
+
+cloudinary.config( 
+    cloud_name = "dcb4mee54",
+    api_key = "112465673685316",
+    api_secret = "zklL8gJi-gyc1JgVYDlhDYSg5_M",
+    secure=True
+)
+
+# MongoDB atlas
 uri = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority&appName=haiad"
 client = MongoClient(uri, server_api=ServerApi('1'))
 db = client['haiad']
-fs = gridfs.GridFS(db)  # 用于存储文件
+
 
 # 集合定义
 videos_collection = db['videos']        # 存储视频信息
@@ -46,7 +58,8 @@ CORS(app)
 
 # 配置常量
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'webm'}
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB in bytes
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 
 # 添加 JSON 编码器
@@ -103,60 +116,77 @@ def token_required(f):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def generate_thumbnail(video_path, video_id):
+def generate_thumbnail(current_user, file, video_id):
     try:
-        # 打开视频文件
-        cap = cv2.VideoCapture(video_path)
+        # 从数据库获取视频信息
+        video = videos_collection.find_one({'_id': ObjectId(video_id)})
+        if not video or 'cloudinary_url' not in video:
+            raise Exception('Video URL not found')
+
+        video_url = video['cloudinary_url']
         
-        # 读取第一帧
-        ret, frame = cap.read()
-        if ret:
-            # 将 OpenCV 的 BGR 格式转换为 RGB
+        # 创建临时目录
+        temp_dir = tempfile.mkdtemp()
+        temp_video_path = os.path.join(temp_dir, f"temp_video_{video_id}.mp4")
+        
+        try:
+            # 使用 requests 下载视频
+            response = requests.get(video_url, stream=True)
+            response.raise_for_status()
+            
+            # 保存视频到临时文件
+            with open(temp_video_path, 'wb') as temp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        temp_file.write(chunk)
+
+            print(f"视频已下载到临时文件: {temp_video_path}")
+
+            # 验证文件是否存在和可读
+            if not os.path.exists(temp_video_path):
+                raise Exception(f"临时文件不存在: {temp_video_path}")
+
+            # 使用 OpenCV 读取视频
+            cap = cv2.VideoCapture(temp_video_path)
+            if not cap.isOpened():
+                raise Exception("无法打开视频文件")
+
+            ret, frame = cap.read()
+            if not ret:
+                raise Exception("无法读取视频帧")
+
+            # 生成缩略图
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # 将 numpy array 转换为 PIL Image
             image = Image.fromarray(rgb_frame)
-            
-            # 调整图片大小（可选）
-            image.thumbnail((320, 180))  # 16:9 比例
-            
+            image.thumbnail((320, 180))
+
             # 将图片转换为字节流
             img_byte_arr = io.BytesIO()
             image.save(img_byte_arr, format='JPEG')
-            img_byte_arr = img_byte_arr.getvalue()
-            
-            # 存储到 GridFS
-            thumbnail_id = fs.put(
-                img_byte_arr,
-                filename=f"{video_id}_thumb.jpg",
-                content_type='image/jpeg'
-            )
-            
-            # 更新视频记录中的缩略图ID
-            videos_collection.update_one(
-                {'_id': ObjectId(video_id)},
-                {'$set': {'thumbnail_id': thumbnail_id}}
-            )
-            
-            cap.release()
-            return str(thumbnail_id)
-            
-    except Exception as e:
-        print(f"Error generating thumbnail: {str(e)}")
-        return None
+            img_byte_arr.seek(0)
 
-# 添加获取缩略图的路由
-@app.route('/api/thumbnails/<thumbnail_id>')
-def get_thumbnail(thumbnail_id):
-    try:
-        # 从 GridFS 获取缩略图
-        file = fs.get(ObjectId(thumbnail_id))
-        return send_file(
-            io.BytesIO(file.read()),
-            mimetype='image/jpeg'
-        )
+            # 上传到 Cloudinary
+            upload_result = cloudinary.uploader.upload(
+                img_byte_arr,
+                folder=f"users/{str(current_user['_id'])}/thumbnails",
+                public_id=f"thumb_{video_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                resource_type="image"
+            )
+
+            cap.release()
+            return upload_result['secure_url']
+
+        finally:
+            # 清理临时文件和目录
+            if os.path.exists(temp_video_path):
+                os.unlink(temp_video_path)
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 404
+        print(f"生成缩略图错误: {str(e)}")
+        traceback.print_exc()
+        return None
 
 # 上传视频
 @app.route('/api/upload', methods=['POST'])
@@ -164,69 +194,193 @@ def get_thumbnail(thumbnail_id):
 def upload_video(current_user):
     try:
         if 'video' not in request.files:
-            return jsonify({'error': 'No video file'}), 400
+            return jsonify({'error': '没有选择视频文件'}), 400
             
         file = request.files['video']
         if file.filename == '':
-            return jsonify({'error': 'No selected file'}), 400
+            return jsonify({'error': '没有选择文件'}), 400
             
         if file and allowed_file(file.filename):
+            # 确保文件名不会重复.mp4
             filename = secure_filename(file.filename)
-            
-            # 将视频文件保存到 GridFS
-            file_id = fs.put(
-                file,
-                filename=filename,
-                content_type=file.content_type,
-                user_id=ObjectId(current_user['_id'])  # 添加用户ID作为元数据
-            )
-
-            if not isinstance(file_id, ObjectId):
-                return jsonify({'error': 'Invalid file ID from GridFS'}), 500
-
-            chunks_count = db.fs.chunks.count_documents({"files_id": file_id})
-            if chunks_count == 0:
-                fs.delete(file_id)  # **删除无效 `file_id`**
-                return jsonify({'error': 'GridFS 存储失败，文件未分块存储'}), 500
-
-            # 创建视频记录
-            video_id = videos_collection.insert_one({
-                'user_id': ObjectId(current_user['_id']),
-                'filename': filename,
-                'original_filename': file.filename,
-                'created_at': datetime.now(),
-                'has_script': False,
-                'file_id': file_id  # GridFS ID
-            }).inserted_id
-            
-            # 生成并保存缩略图
-            # 首先从 GridFS 读取视频文件到临时文件
-            video_data = fs.get(file_id)
-            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_file:
-                temp_file.write(video_data.read())
-                temp_path = temp_file.name
+            print(f"开始上传文件: {filename}")  # 添加日志
             
             try:
+                # 上传到 Cloudinary
+                upload_result = cloudinary.uploader.upload(
+                    file,
+                    resource_type="video",
+                    folder=f"users/{str(current_user['_id'])}/videos",
+                    public_id=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename.rsplit('.', 1)[0]}",  # 移除扩展名
+                    overwrite=True,
+                    chunk_size=6000000,
+                    eager=[
+                        {"streaming_profile": "full_hd", "format": "m3u8"}
+                    ],
+                    eager_async=True
+                )
+
+                print(f"Cloudinary 上传结果: {upload_result}")
+
+                if not upload_result or 'secure_url' not in upload_result:
+                    raise Exception('Failed to upload to Cloudinary')
+
+                # 创建视频记录
+                video_id = videos_collection.insert_one({
+                    'user_id': ObjectId(current_user['_id']),
+                    'filename': filename,
+                    'original_filename': file.filename,
+                    'created_at': datetime.now(),
+                    'has_script': False,
+                    'cloudinary_public_id': upload_result['public_id'],
+                    'cloudinary_url': upload_result['secure_url'],
+                    'cloudinary_resource_type': 'video'
+                }).inserted_id
+
                 # 生成缩略图
-                thumbnail_id = generate_thumbnail(temp_path, str(video_id))
+                thumbnail_url = generate_thumbnail(current_user, file, str(video_id))
                 
-                # 删除临时文件
-                os.unlink(temp_path)
-                
+                if thumbnail_url:
+                    videos_collection.update_one(
+                        {'_id': ObjectId(video_id)},
+                        {'$set': {'thumbnail_url': thumbnail_url}}
+                    )
+
                 return jsonify({
                     'success': True,
                     'video_id': str(video_id),
-                    'thumbnail_id': thumbnail_id
+                    'video_url': upload_result['secure_url'],
+                    'thumbnail_url': thumbnail_url or ''
                 })
-                
+
             except Exception as e:
-                # 如果生成缩略图失败，确保清理临时文件
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-                raise e
-                
+                print(f"上传过程中出错: {str(e)}")
+                traceback.print_exc()
+                return jsonify({'error': f'上传失败: {str(e)}'}), 500
+
     except Exception as e:
+        print(f"外部错误: {str(e)}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+# 添加 Cloudinary 回调接口（可选）
+@app.route('/api/cloudinary_callback', methods=['POST'])
+def cloudinary_callback():
+    try:
+        data = request.json
+        print(f"收到 Cloudinary 回调: {data}")  # 添加日志
+        # 这里可以添加处理回调的逻辑
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"处理回调时出错: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# 获取视频
+@app.route('/api/videos/<video_id>', methods=['GET'])
+@token_required
+def get_video(current_user, video_id):
+    try:
+        # 从数据库获取视频信息，并验证所有权
+        video = videos_collection.find_one({
+            '_id': ObjectId(video_id),
+            'user_id': ObjectId(current_user['_id'])
+        })
+        
+        if not video:
+            return jsonify({'error': '视频不存在或无权访问'}), 404
+
+        if 'cloudinary_url' not in video:
+            return jsonify({'error': '视频文件不存在'}), 404
+            
+        # 返回视频的 Cloudinary URL
+        return jsonify({
+            'success': True,
+            'video_url': video.get('cloudinary_url'),  # 这里应该是 playback_url
+            'original_url': video.get('secure_url', ''),  # 保存原始视频 URL
+            'thumbnail_url': video.get('thumbnail_url', ''),
+            'filename': video.get('original_filename', '')
+        })
+        
+    except Exception as e:
+        print(f"获取视频错误: {str(e)}")
+        traceback.print_exc()  # 添加详细错误日志
+        return jsonify({'error': f'获取视频失败: {str(e)}'}), 500
+
+
+# 删除视频
+@app.route('/api/videos/<video_id>', methods=['DELETE'])
+@token_required
+def delete_video(current_user, video_id):
+    try:
+        # 查找视频记录
+        video = videos_collection.find_one({
+            '_id': ObjectId(video_id),
+            'user_id': ObjectId(current_user['_id'])
+        })
+        
+        if not video:
+            return jsonify({'success': False, 'error': '视频不存在或无权访问'}), 404
+            
+        # 从 Cloudinary 删除视频
+        if 'cloudinary_public_id' in video:
+            try:
+                result = cloudinary.uploader.destroy(
+                    video['cloudinary_public_id'],
+                    resource_type=video.get('cloudinary_resource_type', 'video'),
+                    invalidate=True
+                )
+                print(f"视频删除结果: {result}")
+            except Exception as e:
+                print(f"删除视频文件失败: {str(e)}")
+            
+        # 从 Cloudinary 删除缩略图
+        if 'thumbnail_url' in video:
+            try:
+                # 从 URL 提取 public_id
+                thumbnail_url = video['thumbnail_url']
+                public_id = thumbnail_url.split('/')[-1].split('.')[0]
+                result = cloudinary.uploader.destroy(
+                    public_id,
+                    resource_type='image',
+                    invalidate=True
+                )
+                print(f"缩略图删除结果: {result}")
+            except Exception as e:
+                print(f"删除缩略图失败: {str(e)}")
+            
+        # 删除相关的脚本
+        try:
+            scripts_collection.delete_many({
+                'video_id': ObjectId(video_id),
+                'user_id': ObjectId(current_user['_id'])
+            })
+        except Exception as e:
+            print(f"删除相关脚本失败: {str(e)}")
+            
+        # 删除视频记录
+        result = videos_collection.delete_one({
+            '_id': ObjectId(video_id),
+            'user_id': ObjectId(current_user['_id'])
+        })
+        
+        if result.deleted_count > 0:
+            return jsonify({
+                'success': True,
+                'message': '视频及其相关资源删除成功'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '删除视频记录失败'
+            }), 500
+        
+    except Exception as e:
+        print(f"删除视频时出错: {str(e)}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False, 
+            'error': f'删除失败: {str(e)}'
+        }), 500
 
 # 获取所有上传的视频列表
 @app.route('/api/videos', methods=['GET'])
@@ -244,8 +398,8 @@ def get_videos(current_user):
             'status': video.get('status', 'ready'),
             'has_script': video.get('has_script', False),
             'created_at': video['created_at'].isoformat(),
-            'thumbnail_url': f"/api/thumbnails/{str(video.get('thumbnail_id'))}" if video.get('thumbnail_id') else '',
-            'file_path': video.get('file_path', '')
+            'video_url': video.get('cloudinary_url', ''),
+            'thumbnail_url': video.get('thumbnail_url', '')
         } for video in videos]
         
         return jsonify({
@@ -256,39 +410,6 @@ def get_videos(current_user):
     except Exception as e:
         print(f"Error in get_videos: {str(e)}")
         return jsonify({'success': False, 'error': f'获取视频列表失败: {str(e)}'}), 500
-
-# 删除视频
-@app.route('/api/videos/<video_id>', methods=['DELETE'])
-@token_required
-def delete_video(current_user, video_id):
-    try:
-        # 查找视频记录
-        video = videos_collection.find_one({
-            '_id': ObjectId(video_id),
-            'user_id': ObjectId(current_user['_id'])
-        })
-        
-        if not video:
-            return jsonify({'success': False, 'error': '视频不存在或无权访问'}), 404
-            
-        # 删除 GridFS 中的文件
-        if 'file_id' in video:
-            fs.delete(video['file_id'])
-            
-        # 删除缩略图
-        if 'thumbnail_id' in video:
-            fs.delete(video['thumbnail_id'])
-            
-        # 删除视频记录
-        videos_collection.delete_one({'_id': ObjectId(video_id)})
-        
-        return jsonify({
-            'success': True,
-            'message': '视频删除成功'
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'删除视频失败: {str(e)}'}), 500
 
 # 分析视频 & 生成初始脚本
 @app.route('/api/generatescript', methods=['POST'])
@@ -310,21 +431,27 @@ def generate_script_endpoint(current_user):
         if not video:
             return jsonify({'error': 'Video not found or access denied'}), 404
 
-        # 从 GridFS 获取视频文件
-        if 'file_id' not in video:
-            return jsonify({'error': 'Video file not found in database'}), 404
+        # 检查 Cloudinary URL
+        if 'cloudinary_url' not in video:
+            return jsonify({'error': 'Video URL not found'}), 404
             
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
         os.makedirs(user_temp_dir, exist_ok=True)
 
-        # 将 GridFS 中的视频保存到临时文件
+        # 从 Cloudinary 下载视频到临时文件
         temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
-        with open(temp_video_path, 'wb') as temp_file:
-            grid_file = fs.get(video['file_id'])
-            temp_file.write(grid_file.read())
-
+        
         try:
+            # 使用 requests 下载视频
+            response = requests.get(video['cloudinary_url'], stream=True)
+            response.raise_for_status()  # 确保请求成功
+            
+            with open(temp_video_path, 'wb') as temp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        temp_file.write(chunk)
+
             # 使用临时文件路径进行处理
             scenes = scene_detection(temp_video_path)
             clip_paths = split_video(temp_video_path, scenes, user_temp_dir)
@@ -364,6 +491,9 @@ def generate_script_endpoint(current_user):
                 'scenes': script_array
             })
 
+        except requests.RequestException as e:
+            print(f"Failed to download video: {str(e)}")
+            return jsonify({'error': f'Failed to download video: {str(e)}'}), 500
         except Exception as e:
             print(f"Inner processing error: {str(e)}")
             traceback.print_exc()
@@ -387,38 +517,6 @@ def generate_script_endpoint(current_user):
                 shutil.rmtree(user_temp_dir)
             except Exception as e:
                 print(f"Failed to clean up temp directory: {str(e)}")
-
-# 获取视频
-@app.route('/api/videos/<video_id>', methods=['GET'])
-@token_required
-def get_video(current_user, video_id):
-    try:
-        # 从数据库获取视频信息，并验证所有权
-        video = videos_collection.find_one({
-            '_id': ObjectId(video_id),
-            'user_id': ObjectId(current_user['_id'])
-        })
-        
-        if not video:
-            return jsonify({'error': '视频不存在或无权访问'}), 404
-
-        # 从 GridFS 获取视频文件
-        if 'file_id' not in video:
-            return jsonify({'error': '视频文件不存在'}), 404
-            
-        grid_file = fs.get(video['file_id'])
-        
-        # 使用 send_file 发送视频文件
-        return send_file(
-            io.BytesIO(grid_file.read()),
-            mimetype=grid_file.content_type,
-            as_attachment=False,
-            download_name=video['filename']
-        )
-        
-    except Exception as e:
-        print(f"获取视频错误: {str(e)}")
-        return jsonify({'error': f'获取视频失败: {str(e)}'}), 500
 
 # 下载最新的脚本
 @app.route('/api/videos/<video_id>/script/download', methods=['GET'])
@@ -1044,7 +1142,7 @@ def chat_endpoint(current_user):
             if not result.get('success'):
                 print(f"AI assistant error: {result.get('error')}")
                 return jsonify({'error': 'Failed to get AI response'}), 500
-                
+
             # 保存新对话到数据库
             chat_entry = {
                 'user_id': ObjectId(current_user['_id']),
@@ -1110,3 +1208,8 @@ def get_chat_history(current_user):
     except Exception as e:
         print(f"Get chat history error: {str(e)}")
         return jsonify({'error': f'Failed to get chat history: {str(e)}'}), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5002))
+    app.run(host='0.0.0.0', port=port, debug=True)
+    
