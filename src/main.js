@@ -5,7 +5,7 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import axios from 'axios'
 
-axios.defaults.baseURL = process.env.VUE_APP_API_URL || 'http://localhost:5002'  
+axios.defaults.baseURL = process.env.VUE_APP_API_URL || 'https://haiad-backend.onrender.com'  
 // http://localhost:5001
 // https://haiad-backend.onrender.com
 // 添加请求拦截器

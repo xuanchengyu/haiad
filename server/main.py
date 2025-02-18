@@ -24,8 +24,8 @@ import requests
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
 
-from video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
-from ai_assistant import chat_with_ai
+from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
+from .ai_assistant import chat_with_ai
 
 # cloudinary
 import cloudinary
@@ -1209,7 +1209,7 @@ def get_chat_history(current_user):
         print(f"Get chat history error: {str(e)}")
         return jsonify({'error': f'Failed to get chat history: {str(e)}'}), 500
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5002))
-    app.run(host='0.0.0.0', port=port, debug=True)
+# if __name__ == '__main__':
+#     port = int(os.environ.get('PORT', 5002))
+#     app.run(host='0.0.0.0', port=port, debug=True)
     
