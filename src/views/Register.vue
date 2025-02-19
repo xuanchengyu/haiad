@@ -55,7 +55,7 @@
 
 <script>
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
+import axios from '@/main'
 
 export default {
   name: 'RegisterPage',

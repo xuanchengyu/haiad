@@ -49,7 +49,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+import axios from '@/main'
 import VideoPlayer from '@/components/VideoPlayer.vue'
 import { ElMessage } from 'element-plus'
 

@@ -1,6 +1,6 @@
 <!-- AI预生成模式 -->
 <template>
-  <div class="app-container">
+  <div class="ai-assisted-edit">
     <header class="header">
       <div class="header-left">
         <button @click="goBack" class="back-btn">
@@ -239,8 +239,8 @@ export default {
           };
         }
       } catch (error) {
-        console.error('加载视频失败:', error);
-        ElMessage.error('加载视频失败');
+        console.error('Load Video Failed:', error);
+        ElMessage.error('Load Video Failed');
       }
     }
   }
@@ -248,10 +248,18 @@ export default {
 </script>
 
 <style scoped>
-.app-container {
-  height: 100vh;
+.ai-assisted-edit {
+  height: 100vh;  /* 使用视口高度 */
   display: flex;
   flex-direction: column;
+  overflow: hidden;  /* 防止双重滚动条 */
+}
+
+/* 确保 ScriptEditor 组件能够占满剩余空间 */
+.ai-assisted-edit :deep(.script-editor) {
+  flex: 1;
+  height: 100%;
+  overflow: auto;
 }
 
 .header {

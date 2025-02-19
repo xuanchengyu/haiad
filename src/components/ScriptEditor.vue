@@ -36,6 +36,7 @@
               <span class="material-icons">arrow_downward</span>
             </button>
             <ToggleChat 
+              v-if="mode === 'collaborative'"
               mode="collaborative"
               :video-id="videoId"
               :scene-id="scene._id"
@@ -152,17 +153,17 @@ export default {
         
         if (response.data.success) {
           this.scenes.splice(insertIndex, 0, response.data.scene);
-          ElMessage.success('添加场景成功');
+          ElMessage.success('Add success');
           this.$emit('update:script', this.scenes);
         } else {
-          throw new Error(response.data.error || '添加失败');
+          throw new Error(response.data.error || 'Add failed');
         }
       } catch (error) {
-        console.error('添加场景失败:', error);
+        console.error('Add failed:', error);
         if (error.response?.status === 401) {
           this.$router.push('/login');
         } else {
-          ElMessage.error(error.response?.data?.error || '添加场景失败');
+          ElMessage.error(error.response?.data?.error || 'Add failed');
         }
       }
     },
@@ -192,24 +193,24 @@ export default {
         );
         
         if (response.data.success) {
-          ElMessage.success('更新场景成功');
+          ElMessage.success('Update success');
           this.$emit('update:script', this.scenes);
         } else {
-          throw new Error(response.data.error || '更新失败');
+          throw new Error(response.data.error || 'Update failed');
         }
       } catch (error) {
-        console.error('更新场景失败:', error);
+        console.error('Update failed:', error);
         if (error.response?.status === 401) {
           this.$router.push('/login');
         } else {
-          ElMessage.error(error.response?.data?.error || '更新场景失败');
+          ElMessage.error(error.response?.data?.error || 'Update failed');
         }
       }
     },
 
     async deleteScene(sceneId) {
       try {
-        if (!confirm('确定要删除这个场景吗？')) {
+        if (!confirm('Are you sure you want to delete this line?')) {
           return;
         }
 
@@ -232,31 +233,31 @@ export default {
           const index = this.scenes.findIndex(s => s._id === sceneId);
           if (index > -1) {
             this.scenes.splice(index, 1);
-            ElMessage.success('删除场景成功');
+            ElMessage.success('Delete success');
             this.$emit('update:script', this.scenes);
           }
         } else {
-          throw new Error(response.data.error || '删除失败');
+          throw new Error(response.data.error || 'Delete failed');
         }
       } catch (error) {
-        console.error('删除场景失败:', error);
+        console.error('Delete scene failed:', error);
         if (error.response?.status === 401) {
           this.$router.push('/login');
         } else {
-          ElMessage.error(error.response?.data?.error || '删除场景失败');
+          ElMessage.error(error.response?.data?.error || 'Delete failed');
         }
       }
     },
 
     async handleAIChat(scene, userMessage) {
       try {
-        console.log('处理 AI 聊天:', {
+        console.log('Handle AI chat:', {
           scene,
           userMessage
         });
         
         if (!scene || !scene._id) {
-          throw new Error('无效的场景数据');
+          throw new Error('Invalid scene data');
         }
 
         const response = await axios.post('/api/ai/scene/chat', {
@@ -273,13 +274,13 @@ export default {
         if (response.data.success) {
           return response.data.chat_history;
         } else {
-          const errorMsg = response.data.error || 'AI 处理失败';
-          console.error('AI 处理失败:', errorMsg);
+          const errorMsg = response.data.error || 'AI processing failed';
+          console.error('AI processing failed:', errorMsg);
           ElMessage.error(errorMsg);
         }
       } catch (error) {
-        console.error('AI 聊天失败:', error);
-        ElMessage.error(error.message || 'AI 聊天失败');
+        console.error('AI chat failed:', error);
+        ElMessage.error(error.message || 'AI chat failed');
       }
     }
   },

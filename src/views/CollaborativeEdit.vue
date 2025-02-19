@@ -104,8 +104,8 @@
             };
           }
         } catch (error) {
-          console.error('加载视频失败:', error);
-          ElMessage.error('加载视频失败');
+          console.error('Load Video Failed:', error);
+          ElMessage.error('Load Video Failed');
         }
       },
       async loadScript() {

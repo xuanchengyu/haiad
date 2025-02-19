@@ -239,14 +239,14 @@ export default {
         });
 
         if (response.data.success) {
-          ElMessage.success('视频删除成功');
+          ElMessage.success('Delete Success');
           await this.fetchVideos();
         } else {
-          ElMessage.error(response.data.error || '删除失败');
+          ElMessage.error(response.data.error || 'Delete Failed');
         }
       } catch (error) {
-        console.error('删除视频失败:', error);
-        ElMessage.error(error.response?.data?.error || '删除视频失败');
+        console.error('Delete Video Failed:', error);
+        ElMessage.error(error.response?.data?.error || 'Delete Video Failed');
       }
     },
 

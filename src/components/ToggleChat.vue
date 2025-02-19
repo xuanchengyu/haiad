@@ -18,7 +18,7 @@
            :style="dialogPosition"
       >
         <div class="chat-header">
-          <span>AI Chat</span>
+          <span>How would you like to modify the script?</span>
           <button class="close-btn" @click="toggleAIChat">×</button>
         </div>
         <div class="chat-history" ref="chatHistory">
@@ -183,15 +183,15 @@ export default {
             }
           });
         } else {
-          throw new Error(response.data.error || '请求失败');
+          throw new Error(response.data.error || 'Request failed');
         }
         
       } catch (error) {
-        console.error('发送消息失败:', error);
-        ElMessage.error(error.message || '发送消息失败');
+        console.error('Send message failed:', error);
+        ElMessage.error(error.message || 'Send message failed');
         this.chatMessages.push({
           role: 'system',
-          content: '发送消息失败，请重试。',
+          content: 'Send message failed, please try again.',
           timestamp: new Date()
         });
       } finally {
@@ -206,28 +206,25 @@ export default {
 .toggle-chat {
   display: inline-block;
   position: relative;
-  z-index: 100;
 }
 
 .control-btn {
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: white;
-  color: #666;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #1d1d1f;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .control-btn:hover {
-  background-color: #e3f2fd;
-  color: #2196f3;
-  border-color: #2196f3;
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
 .control-btn.active {
@@ -241,26 +238,113 @@ export default {
 }
 
 .ai-chat-dialog {
-  position: fixed;
-  width: 300px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: absolute;
+  width: 320px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  max-height: 400px;
-  animation: slideIn 0.3s ease-out;
+  max-height: 480px;
+  border: 1px solid #e5e7eb;
 }
 
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 12px 12px 0 0;
+}
+
+.chat-header span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.chat-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.chat-message {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 85%;
+}
+
+.chat-message.user {
+  background-color: #f3f4f6;
+  color: #374151;
+  margin-left: auto;
+}
+
+.chat-message.assistant {
+  background-color: #e5e7eb;
+  color: #374151;
+  margin-right: auto;
+}
+
+.chat-message.system {
+  background-color: #fff3e0;
+  margin: 8px auto;
+  font-style: italic;
+  width: 100%;
+}
+
+.chat-input {
+  padding: 12px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 8px;
+  background: #f9fafb;
+  border-radius: 0 0 12px 12px;
+}
+
+.chat-input input {
+  flex: 1;
   padding: 8px 12px;
-  background-color: #f5f7fa;
-  border-bottom: 1px solid #ddd;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #374151;
+  background: #ffffff;
+}
+
+.chat-input input:focus {
+  outline: none;
+  border-color: #6b7280;
+  box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.1);
+}
+
+.chat-input button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background-color: #6b7280;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.chat-input button:hover {
+  background-color: #4b5563;
+}
+
+.chat-input button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
 }
 
 .close-btn {
@@ -274,64 +358,6 @@ export default {
 
 .close-btn:hover {
   color: #f56c6c;
-}
-
-.chat-history {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 12px;
-  max-height: 300px;
-}
-
-.chat-message {
-  margin-bottom: 8px;
-  padding: 8px;
-  border-radius: 4px;
-  max-width: 85%;
-}
-
-.chat-message.user {
-  background-color: #e3f2fd;
-  margin-left: auto;
-}
-
-.chat-message.assistant {
-  background-color: #f5f5f5;
-  margin-right: auto;
-}
-
-.chat-message.system {
-  background-color: #fff3e0;
-  margin: 8px auto;
-  font-style: italic;
-  width: 100%;
-}
-
-.chat-input {
-  display: flex;
-  padding: 8px;
-  border-top: 1px solid #ddd;
-}
-
-.chat-input input {
-  flex-grow: 1;
-  padding: 6px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  margin-right: 8px;
-}
-
-.chat-input button {
-  padding: 6px 12px;
-  background-color: #1976d2;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.chat-input button:hover {
-  background-color: #1565c0;
 }
 
 @keyframes slideIn {

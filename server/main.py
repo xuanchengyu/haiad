@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import os
 import tempfile
@@ -56,7 +56,10 @@ users_collection.create_index('username', unique=True) # 创建用户名索引�
 chat_history_collection = db['chat_history']
 scene_chat_history_collection = db['scene_chat_history']
 
-app = Flask(__name__)
+app = Flask(__name__, 
+    static_folder='../dist',
+    static_url_path=''
+)
 CORS(app)
 
 # 配置常量
@@ -77,10 +80,25 @@ class MongoJSONEncoder(json.JSONEncoder):
 # 配置 Flask 使用自定义 JSON 编码器
 app.json_encoder = MongoJSONEncoder
 
+# 处理所有非 API 路由
+@app.route('/')
+@app.route('/login')
+@app.route('/register')
+@app.route('/project/<path:path>')
+def serve_vue_app(path=None):
+    return send_file('../dist/index.html')
 
-@app.route("/")
-def home():
-    return {"message": "Flask is running with Gunicorn on Render!"}
+# API 路由保持不变
+@app.route('/api/...')
+def api_routes():
+    pass
+
+# 处理静态资源
+@app.route('/<path:path>')
+def serve_static(path):
+    if os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    return send_file('../dist/index.html')
 
 # 添加token验证装饰器
 def token_required(f):
@@ -276,18 +294,6 @@ def upload_video(current_user):
     except Exception as e:
         print(f"外部错误: {str(e)}")
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# 添加 Cloudinary 回调接口（可选）
-@app.route('/api/cloudinary_callback', methods=['POST'])
-def cloudinary_callback():
-    try:
-        data = request.json
-        print(f"收到 Cloudinary 回调: {data}")  # 添加日志
-        # 这里可以添加处理回调的逻辑
-        return jsonify({'success': True})
-    except Exception as e:
-        print(f"处理回调时出错: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # 获取视频

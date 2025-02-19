@@ -80,7 +80,7 @@ export default {
   methods: {
     initializePlayer() {
       if (!this.videoUrl) {
-        console.error('视频 URL 不存在');
+        console.error('Video URL does not exist');
         return;
       }
 
@@ -100,12 +100,12 @@ export default {
         };
 
         this.player = videojs(this.$refs.videoRef, options, () => {
-          console.log('播放器初始化完成');
+          console.log('Player initialization completed');
           this.setupEventListeners();
           this.startProgressUpdate();
         });
       } catch (error) {
-        console.error('播放器初始化失败:', error);
+        console.error('Player initialization failed:', error);
       }
     },
 
@@ -211,7 +211,7 @@ export default {
                parseInt(secs || 0) + 
                parseInt(ms || 0) / 1000;
       } catch (error) {
-        console.error('时间解析失败:', error);
+        console.error('Time parsing failed:', error);
         return 0;
       }
     },
@@ -220,10 +220,10 @@ export default {
       if (this.player) {
         try {
           const parsedTime = this.parseTime(time);
-          console.log('跳转到时间:', parsedTime); // 添加日志
+          console.log('Jump to time:', parsedTime); // 添加日志
           
           if (isNaN(parsedTime) || !isFinite(parsedTime)) {
-            console.error('无效的时间值:', time);
+            console.error('Invalid time value:', time);
             return;
           }
 
@@ -231,7 +231,7 @@ export default {
           const targetTime = Math.max(0, Math.min(parsedTime, duration));
           this.player.currentTime(targetTime);
         } catch (error) {
-          console.error('跳转到指定时间失败:', error);
+          console.error('Jump to specified time failed:', error);
         }
       }
     },

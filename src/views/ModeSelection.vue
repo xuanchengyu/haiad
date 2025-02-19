@@ -53,11 +53,11 @@ export default {
     }
   },
   mounted() {
-    console.log('当前视频ID:', this.videoId); // 添加调试日志
+    console.log('Current Video ID:', this.videoId); // 添加调试日志
   },
   methods: {
     selectMode(mode) {
-      console.log('选择模式:', mode, '视频ID:', this.videoId);
+      console.log('Select Mode:', mode, 'Video ID:', this.videoId);
       try {
         let path = '';
         switch(mode) {
@@ -73,7 +73,7 @@ export default {
         }
         this.$router.push(path);
       } catch (error) {
-        console.error('路由跳转失败:', error);
+        console.error('Route Navigation Failed:', error);
       }
     },
     goBack() {
