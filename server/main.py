@@ -56,14 +56,13 @@ users_collection.create_index('username', unique=True) # 创建用户名索引�
 chat_history_collection = db['chat_history']
 scene_chat_history_collection = db['scene_chat_history']
 
-# 获取项目根目录的绝对路径
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-app = Flask(__name__, 
-    static_folder=os.path.join(BASE_DIR, 'views'),
-    static_url_path=''
-)
+app = Flask(__name__)
 CORS(app)
+
+@app.route("/")
+def home():
+    return {"message": "Flask is running on Render!"}
 
 # 配置常量
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'webm'}
@@ -83,58 +82,6 @@ class MongoJSONEncoder(json.JSONEncoder):
 # 配置 Flask 使用自定义 JSON 编码器
 app.json_encoder = MongoJSONEncoder
 
-# 处理所有前端路由
-@app.route('/')
-@app.route('/login')
-@app.route('/register')
-@app.route('/mode-select/<path:id>')
-@app.route('/human-only/<path:id>')
-@app.route('/ai-assisted/<path:id>')
-@app.route('/collaborative/<path:id>')
-@app.route('/ai-assistant')
-def serve_vue_app(id=None):
-    try:
-        # 根据路由返回对应的 Vue 组件
-        if request.path == '/login':
-            return send_file(os.path.join(BASE_DIR, 'views', 'Login.vue'))
-        elif request.path == '/register':
-            return send_file(os.path.join(BASE_DIR, 'views', 'Register.vue'))
-        elif request.path == '/':
-            return send_file(os.path.join(BASE_DIR, 'views', 'VideoList.vue'))
-        elif '/mode-select/' in request.path:
-            return send_file(os.path.join(BASE_DIR, 'views', 'ModeSelection.vue'))
-        elif '/human-only/' in request.path:
-            return send_file(os.path.join(BASE_DIR, 'views', 'HumanOnlyEdit.vue'))
-        elif '/ai-assisted/' in request.path:
-            return send_file(os.path.join(BASE_DIR, 'views', 'AIAssistedEdit.vue'))
-        elif '/collaborative/' in request.path:
-            return send_file(os.path.join(BASE_DIR, 'views', 'CollaborativeEdit.vue'))
-        elif '/ai-assistant' in request.path:
-            return send_file(os.path.join(BASE_DIR, 'views', 'AiAssistant.vue'))
-            
-    except Exception as e:
-        print(f"Error serving Vue app: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# 处理静态资源
-@app.route('/<path:path>')
-def serve_static(path):
-    static_dir = os.path.join(BASE_DIR, 'views')
-    if os.path.exists(os.path.join(static_dir, path)):
-        return send_from_directory(static_dir, path)
-    return serve_vue_app()
-
-# 添加调试信息
-@app.before_first_request
-def check_paths():
-    print(f"Base directory: {BASE_DIR}")
-    print(f"Static folder: {app.static_folder}")
-    print(f"Views directory content: {os.listdir(os.path.join(BASE_DIR, 'views'))}")
-
-# API 路由保持不变
-@app.route('/api/...')
-def api_routes():
-    pass
 
 # 添加token验证装饰器
 def token_required(f):
