@@ -57,7 +57,7 @@ chat_history_collection = db['chat_history']
 scene_chat_history_collection = db['scene_chat_history']
 
 app = Flask(__name__, 
-    static_folder='../dist',
+    static_folder='../views',
     static_url_path=''
 )
 CORS(app)
@@ -84,9 +84,8 @@ app.json_encoder = MongoJSONEncoder
 @app.route('/')
 @app.route('/login')
 @app.route('/register')
-@app.route('/project/<path:path>')
 def serve_vue_app(path=None):
-    return send_file('../dist/index.html')
+    return send_file('../views/Login.vue')
 
 # API 路由保持不变
 @app.route('/api/...')
@@ -98,7 +97,7 @@ def api_routes():
 def serve_static(path):
     if os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
-    return send_file('../dist/index.html')
+    return send_file('../views/Login.vue')
 
 # 添加token验证装饰器
 def token_required(f):
