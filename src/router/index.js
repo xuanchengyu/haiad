@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import VideoList from '@/views/VideoList.vue'
 import ModeSelection from '@/views/ModeSelection.vue'
 import HumanOnlyEdit from '@/views/HumanOnlyEdit.vue'
-import AIAssistedEdit from '@/views/AIAssistedEdit.vue'
 import CollaborativeEdit from '@/views/CollaborativeEdit.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
@@ -23,11 +22,6 @@ const routes = [
     path: '/human-only/:id',
     name: 'HumanOnlyEdit',
     component: HumanOnlyEdit
-  },
-  {
-    path: '/ai-assisted/:id',
-    name: 'AIAssistedEdit',
-    component: AIAssistedEdit
   },
   {
     path: '/collaborative/:id',

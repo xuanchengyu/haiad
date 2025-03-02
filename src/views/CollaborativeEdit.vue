@@ -6,7 +6,7 @@
           <button @click="goBack" class="back-btn">
             Back
           </button>
-          <h1>AD Copilot (Interactive Post-editing)</h1>
+          <h1>AD Copilot (Interactive Writing)</h1>
         </div>
         <div class="header-buttons">
           <button 

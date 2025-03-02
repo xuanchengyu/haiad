@@ -11,7 +11,6 @@
               v-model="scene.start_time"
               class="time-input"
               @click="$emit('seek', scene.start_time)"
-              style="cursor: pointer"
             />
             <span class="time-separator">-</span>
             <input 
@@ -19,7 +18,6 @@
               v-model="scene.end_time"
               class="time-input"
               @click="$emit('seek', scene.end_time)"
-              style="cursor: pointer"
             />
           </div>
           <div class="scene-controls">
@@ -27,7 +25,7 @@
               <span class="material-icons">delete</span>
             </button>
             <button @click="updateScene(scene)" class="control-btn" title="Save Scene">
-              <span class="material-icons">save_as</span>
+              <span class="material-icons">save</span>
             </button>
             <button @click="addScene(scene._id, 'before')" class="control-btn" title="Add Scene Above">
               <span class="material-icons">arrow_upward</span>
@@ -36,7 +34,6 @@
               <span class="material-icons">arrow_downward</span>
             </button>
             <ToggleChat 
-              v-if="mode === 'collaborative'"
               mode="collaborative"
               :video-id="videoId"
               :scene-id="scene._id"
@@ -312,127 +309,203 @@ export default {
 .scenes-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   width: 100%;
 }
 
 .scene-block {
   width: 100%;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
   background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .scene-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  gap: 8px;
+  flex-wrap: nowrap;
+  width: 100%;
+  margin-bottom: 16px;
 }
 
 .time-range {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .time-input {
-  width: 100px;
-  padding: 5px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-family: monospace;
+  width: 120px;
+  min-width: 100px;
+  padding: 8px 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 13px;
+  text-align: center;
+  letter-spacing: 0px;
 }
 
 .time-separator {
-  color: #666;
+  padding: 0 2px;
 }
 
 .scene-content {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
+  margin-bottom: 8px;
 }
 
 .scene-description {
-  flex: 1;
   width: 100%;
-  min-height: 100px;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  min-height: 120px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   resize: vertical;
   font-family: inherit;
-  line-height: 1.5;
+  line-height: 1.6;
+  font-size: 15px;
+  color: #1f2937;
+  background: #f9fafb;
+  transition: all 0.2s ease;
+}
+
+.scene-description:hover {
+  border-color: #d1d5db;
 }
 
 .scene-description:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: #3b82f6;
+  background: white;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .scene-controls {
-  position: relative;
-  overflow: visible;
   display: flex;
-  gap: 5px;
+  gap: 4px;
   align-items: center;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .control-btn {
   width: 32px;
   height: 32px;
-  padding: 0;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
   background-color: white;
-  color: #666;
+  color: #6b7280;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+}
+
+.control-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
 }
 
 /* 删除按钮 */
 .control-btn:nth-child(1):hover {
-  background-color: #ffebee;
-  color: #f44336;
-  border-color: #f44336;
+  background-color: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
 }
 
 /* 保存按钮 */
 .control-btn:nth-child(2):hover {
-  background-color: #e8f5e9;
-  color: #4caf50;
-  border-color: #4caf50;
+  background-color: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
 }
 
 /* 上下箭头按钮 */
 .control-btn:nth-child(3):hover,
 .control-btn:nth-child(4):hover {
-  background-color: #e3f2fd;
-  color: #2196f3;
-  border-color: #2196f3;
+  background-color: #eff6ff;
+  color: #3b82f6;
+  border-color: #bfdbfe;
 }
 
 .material-icons {
-  font-size: 18px;
-}
-
-.loading, .error {
-  padding: 20px;
-  text-align: center;
-}
-
-.error {
-  color: red;
+  font-size: 20px;
 }
 
 .speech-rate {
-  margin: 5px 0;
-  color: #666;
-  font-size: 0.8em;
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 14px;
+  padding: 4px 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* 占位符文本样式 */
+.scene-description::placeholder {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* 加载和错误状态 */
+.loading, .error {
+  padding: 40px;
+  text-align: center;
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.error {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+  .time-input {
+    width: 110px;
+    min-width: 90px;
+    font-size: 12px;
+    padding: 6px 2px;
+  }
+  
+  .control-btn {
+    width: 28px;
+    height: 28px;
+    padding: 3px;
+  }
+  
+  .scene-controls {
+    gap: 2px;
+  }
+  
+  .material-icons {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .time-input {
+    width: 100px;
+    min-width: 80px;
+    font-size: 11px;
+  }
+  
+  .control-btn {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .material-icons {
+    font-size: 16px;
+  }
 }
 </style> 
