@@ -1,6 +1,7 @@
 from moviepy.video.io. VideoFileClip import VideoFileClip
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from scenedetect import SceneManager, ContentDetector, open_video
+import subprocess
 import whisperx
 import numpy as np
 from openai import OpenAI
@@ -9,6 +10,8 @@ import base64
 from io import BytesIO
 import os
 import traceback
+import cv2
+import glob
 
 # 初始化OpenAI客户端
 client = OpenAI(api_key="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")
@@ -24,8 +27,8 @@ def scene_detection(video_path):
         # 添加内容检测器
         scene_manager.add_detector(
             ContentDetector(
-                threshold=30.0,  # 场景切换敏感度
-                min_scene_len=30  # 最小场景长度（帧数）
+                threshold=35.0,  # 场景切换敏感度
+                min_scene_len=60  # 最小场景长度（帧数）
             )
         )
         # 检测场景
@@ -41,14 +44,81 @@ def scene_detection(video_path):
 def split_video(video_path, scene_list, output_dir):
     try:
         clip_paths = []
+        # 验证输入视频
+        if not os.path.exists(video_path):
+            print(f"输入视频不存在: {video_path}")
+            return []
+            
+        # 获取视频信息
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            print(f"无法打开视频: {video_path}")
+            return []
+            
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        duration = total_frames / fps
+        cap.release()
+
         for i, scene in enumerate(scene_list):
-            start, end = scene[0].get_seconds(), scene[1].get_seconds()
-            clip_path = os.path.join(output_dir, f"clip_{i+1}.mp4")
-            ffmpeg_extract_subclip(video_path, start, end, targetname=clip_path)
-            clip_paths.append(clip_path)
+            try:
+                start_time = scene[0].get_seconds()
+                end_time = scene[1].get_seconds()
+                
+                # 验证时间范围
+                if start_time >= end_time or start_time < 0 or end_time > duration:
+                    print(f"无效的时间范围: {start_time}-{end_time}, 跳过片段 {i+1}")
+                    continue
+                    
+                # 确保片段至少有一帧
+                if end_time - start_time < 1/fps:
+                    print(f"片段 {i+1} 太短，跳过")
+                    continue
+                    
+                clip_path = os.path.join(output_dir, f"clip_{i+1}.mp4")
+                
+                # 使用 FFmpeg 命令行直接分割视频
+                command = [
+                    'ffmpeg',
+                    '-i', video_path,
+                    '-ss', str(start_time),
+                    '-t', str(end_time - start_time),
+                    '-c', 'copy',  # 使用快速复制模式
+                    '-avoid_negative_ts', '1',
+                    '-y',  # 覆盖已存在的文件
+                    clip_path
+                ]
+                
+                result = subprocess.run(command, capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    print(f"分割片段 {i+1} 失败: {result.stderr}")
+                    continue
+                    
+                # 验证生成的片段
+                check_cap = cv2.VideoCapture(clip_path)
+                if not check_cap.isOpened():
+                    print(f"无法验证片段 {i+1}")
+                    continue
+                    
+                clip_frames = int(check_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                check_cap.release()
+                
+                if clip_frames > 0:
+                    clip_paths.append(clip_path)
+                else:
+                    print(f"片段 {i+1} 没有有效帧")
+                    if os.path.exists(clip_path):
+                        os.remove(clip_path)
+                        
+            except Exception as e:
+                print(f"处理片段 {i+1} 时出错: {str(e)}")
+                continue
+                
         return clip_paths
+        
     except Exception as e:
-        print(f"Video splitting error: {str(e)}")
+        print(f"视频分割错误: {str(e)}")
         return []
 
 def speech_recognition(video_path):
@@ -68,7 +138,8 @@ def sample_frames(video_clip, num_frames):
         return frames
     except Exception as e:
         print(f"Frame sampling error: {str(e)}")
-        return []
+        return []  
+        
 
 def convert_to_base64(image):
     try:
@@ -79,7 +150,7 @@ def convert_to_base64(image):
         print(f"Image conversion error: {str(e)}")
         return ""
 
-def generate_clip_descriptions(clip_paths, scenes, num_frames=10):
+def generate_clip_descriptions(clip_paths, scenes, num_frames=2):
     try:
         descriptions = []
         for clip_path, scene in zip(clip_paths, scenes):
@@ -135,7 +206,7 @@ def generate_script(clip_descriptions):
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            max_tokens=1000
+            max_tokens=10000
         )
 
         # 直接执行返回的 Python 代码

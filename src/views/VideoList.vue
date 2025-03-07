@@ -96,6 +96,7 @@
 import axios from '@/main';
 import NavBar from '@/components/NavBar.vue'
 import { ElMessage } from 'element-plus';
+import { upload } from '@/main'  // 确保正确导入
 
 export default {
   name: 'VideoList',
@@ -188,30 +189,57 @@ export default {
       
       this.isUploading = true;
       try {
-        const response = await axios.post('/api/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          },
+        const response = await upload.post('/api/upload', formData, {
+          timeout: 3600000,  // 在请求级别也设置超时
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
             );
-            console.log('Upload progress:', percentCompleted);
-          }
+            this.uploadProgress = percentCompleted;
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
         });
 
-        if (response.data.success) {
-          alert('Upload successful');
-          this.selectedFile = null;
-          const fileInput = document.querySelector('input[type="file"]');
-          if (fileInput) fileInput.value = '';
-          this.fetchVideos();
+        // 添加详细的响应数据日志
+        console.log('Upload response:', response);
+
+        // 检查响应状态和数据结构
+        if (response.data && typeof response.data === 'object') {
+          if (response.data.success) {
+            ElMessage.success('Upload Success');
+            this.selectedFile = null;
+            const fileInput = this.$refs.fileInput;
+            if (fileInput) fileInput.value = '';
+            await this.fetchVideos();
+          } else {
+            throw new Error(response.data.error || 'Upload Failed');
+          }
         } else {
-          throw new Error(response.data.error || 'Upload failed');
+          throw new Error('Server Returned Data Format Error');
         }
       } catch (error) {
-        console.error('Upload failed:', error);
-        alert(error.response?.data?.error || 'Upload failed, please try again');
+        console.error('Upload Failed Details:', {
+          error: error,
+          response: error.response,
+          message: error.message,
+          stack: error.stack
+        });
+        
+        // 根据错误类型显示不同的错误消息
+        if (error.code === 'ECONNABORTED') {
+          ElMessage.error('Upload Timeout, Please Check Network Connection or Try Again');
+        } else if (error.response?.status === 413) {
+          ElMessage.error('File Too Large, Please Select a Smaller File');
+        } else if (error.response?.status === 415) {
+          ElMessage.error('Unsupported File Type');
+        } else {
+          ElMessage.error(
+            error.response?.data?.error || 
+            error.message || 
+            'Upload Failed, Please Try Again'
+          );
+        }
       } finally {
         this.isUploading = false;
       }

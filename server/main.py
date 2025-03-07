@@ -22,6 +22,7 @@ import io
 from PIL import Image
 import requests
 from base64 import b64decode
+import re
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
 
@@ -332,7 +333,7 @@ def delete_video(current_user, video_id):
                     video['cloudinary_public_id'],
                     resource_type=video.get('cloudinary_resource_type', 'video'),
                     invalidate=True
-                )
+                )            
                 print(f"视频删除结果: {result}")
             except Exception as e:
                 print(f"删除视频文件失败: {str(e)}")
@@ -342,7 +343,12 @@ def delete_video(current_user, video_id):
             try:
                 # 从 URL 提取 public_id
                 thumbnail_url = video['thumbnail_url']
-                public_id = thumbnail_url.split('/')[-1].split('.')[0]
+                # 从 URL 中提取完整的 public_id，包括文件夹路径
+                # 例如: users/67b3b1145368156d24c24292/thumbnails/thumb_xxx
+                path_parts = thumbnail_url.split('/upload/')[1].split('.')
+                public_id = path_parts[0]
+                print(f"正在删除缩略图，public_id: {public_id}")
+                
                 result = cloudinary.uploader.destroy(
                     public_id,
                     resource_type='image',
@@ -351,6 +357,8 @@ def delete_video(current_user, video_id):
                 print(f"缩略图删除结果: {result}")
             except Exception as e:
                 print(f"删除缩略图失败: {str(e)}")
+                print(f"缩略图 URL: {thumbnail_url}")
+                traceback.print_exc()
             
         # 删除相关的脚本
         try:
@@ -461,8 +469,9 @@ def generate_script_endpoint(current_user):
             clip_paths = split_video(temp_video_path, scenes, user_temp_dir)
             transcript = speech_recognition(temp_video_path)
             clip_descriptions = generate_clip_descriptions(clip_paths, scenes, num_frames=2)
-            added_clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
-            script_array = generate_script(added_clip_descriptions)
+            if transcript:
+                clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
+            script_array = generate_script(clip_descriptions)
             
             for scene in script_array:
                 scene['_id'] = str(ObjectId())
