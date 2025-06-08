@@ -14,7 +14,7 @@
           :disabled="!videoId || isGenerating"
           class="generate-btn"
         >
-          {{ isGenerating ? 'Analysing...' : 'Start Generating' }}
+          {{ isGenerating ? 'Loading...' : 'Start Editing' }}
         </button>
         <button 
           @click="saveScript"
@@ -62,7 +62,7 @@
 import axios from '@/main'
 import VideoPlayer from '@/components/VideoPlayer.vue'
 import ScriptEditor from '@/components/ScriptEditor.vue'
-import AiAssistant from '@/components/AiAssistant.vue'
+// import AiAssistant from '@/components/AiAssistant.vue'
 import { ElMessage } from 'element-plus'
 
 export default {
@@ -70,7 +70,7 @@ export default {
   components: {
     VideoPlayer,
     ScriptEditor,
-    AiAssistant
+    // AiAssistant
   },
   data() {
     return {
@@ -88,6 +88,7 @@ export default {
   async created() {
     await this.loadVideoData();
     await this.loadScript();
+    // await this.generateScript();
   },
   methods: {
     async loadVideoData() {
@@ -160,16 +161,16 @@ export default {
         if (response.data.success) {
           this.scenes = response.data.scenes;
           this.script = response.data.content || '';
-          ElMessage.success('Script generated successfully!');
+          ElMessage.success("Let's edit!");
         } else {
-          throw new Error(response.data.error || 'Failed to generate script');
+          throw new Error(response.data.error || 'Failed to load editing workspace');
         }
       } catch (error) {
         if (error.response?.status === 401) {
           this.$router.push('/login');
         } else {
-          console.error('Failed to generate script:', error);
-          ElMessage.error(error.response?.data?.error || 'Failed to generate script');
+          console.error('Failed to load editing workspace:', error);
+          ElMessage.error(error.response?.data?.error || 'Failed to load editing workspace');
         }
       } finally {
         this.isGenerating = false;
@@ -266,7 +267,7 @@ export default {
 .main-content {
   flex: 1;
   display: grid;
-  grid-template-columns: 35% 35% 28% !important;
+  grid-template-columns: 35% 60% 1% !important;
   gap: 1rem;
   padding: 1rem;
   overflow: hidden;
