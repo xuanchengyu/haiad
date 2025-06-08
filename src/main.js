@@ -1,14 +1,15 @@
-import axios from 'axios'
-import ElementPlus, { ElMessage } from 'element-plus'
-import 'element-plus/dist/index.css'
-import { createPinia } from 'pinia'
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 // 配置 axios
 const axiosInstance = axios.create({
-    baseURL: 'http://localhost:5002',  
+    baseURL: 'https://haiad.onrender.com/',  
     // https://haiad-backend.onrender.com 
     // http://localhost:5002你的后端 API 地址
     timeout: 600000,  // 10分钟
@@ -19,7 +20,7 @@ const axiosInstance = axios.create({
 
 // 为上传请求创建特殊的实例
 const uploadInstance = axios.create({
-    baseURL: 'http://localhost:5002',
+    baseURL: 'https://haiad-backend.onrender.com',
     timeout: 3600000,  // 1小时
     headers: {
         'Content-Type': 'multipart/form-data'
