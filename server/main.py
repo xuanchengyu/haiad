@@ -25,22 +25,76 @@ from base64 import b64decode
 import re
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
+# from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions,generate_script,split_video_segment,generate_descriptions
 
-from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_script
+from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_clip_description,generate_script,split_video_segment,generate_descriptions,generate_script_2,generate_script_with_instruction
 from .ai_assistant import chat_with_ai
 from .toggle_chat import handle_scene_chat
+
+
+
+# ============================
+# 本地便捷测试数据库
+
+
+
+
+
+
+
+
+
+# from urllib3.util.retry import Retry
+# from requests.adapters import HTTPAdapter
+
+# retry_strategy = Retry(
+#     total=5,  # 总重试次数
+#     backoff_factor=1,  # 指数退避因子
+#     status_forcelist=[500, 502, 503, 504],  # 触发重试的HTTP状态码
+#     allowed_methods=["GET"]  # 仅对GET请求重试
+# )
+
+# session = requests.Session()
+# session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
+# response = session.get(video_url, stream=True)
+
+
+
+
+
+
+
+
+
+
+
+# =====================================
+
 
 # cloudinary
 import cloudinary
 import cloudinary.uploader
 from cloudinary.utils import cloudinary_url
 
+# cloudinary.config( 
+#     cloud_name = "dcb4mee54",
+#     api_key = "112465673685316",
+#     api_secret = "zklL8gJi-gyc1JgVYDlhDYSg5_M",
+#     secure=True
+# )
+
+# yangruixia  cloudinary
 cloudinary.config( 
-    cloud_name = "dcb4mee54",
-    api_key = "112465673685316",
-    api_secret = "zklL8gJi-gyc1JgVYDlhDYSg5_M",
+    cloud_name = "dt0e1nlqj",  # 替换为新账号的 cloud_name
+    api_key = "617634364954444",  # 替换为新账号的 api_key
+    api_secret = "wL-TOfaYyP8vr_ezcOqZQ9QVUOE",  # 替换为新账号的 api_secret
     secure=True
 )
+
+# 新的cloudinary账号
+# yrx_haiad
+# 617634364954444
+# wL-TOfaYyP8vr_ezcOqZQ9QVUOE
 
 # MongoDB atlas
 uri = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority&appName=haiad"
@@ -436,45 +490,53 @@ def generate_script_endpoint(current_user):
             return jsonify({'error': 'Video ID not provided'}), 400
         
         # 获取视频信息并验证所有权
-        video = videos_collection.find_one({
-            '_id': ObjectId(video_id),
-            'user_id': ObjectId(current_user['_id'])
-        })
-        if not video:
-            return jsonify({'error': 'Video not found or access denied'}), 404
+        # video = videos_collection.find_one({
+        #     '_id': ObjectId(video_id),
+        #     'user_id': ObjectId(current_user['_id'])
+        # })
+        # if not video:
+        #     return jsonify({'error': 'Video not found or access denied'}), 404
 
         # 检查 Cloudinary URL
-        if 'cloudinary_url' not in video:
-            return jsonify({'error': 'Video URL not found'}), 404
+        # if 'cloudinary_url' not in video:
+        #     return jsonify({'error': 'Video URL not found'}), 404
             
         # 创建临时目录
-        user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
-        os.makedirs(user_temp_dir, exist_ok=True)
+        # user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
+        # os.makedirs(user_temp_dir, exist_ok=True)
 
         # 从 Cloudinary 下载视频到临时文件
-        temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
+        # temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
         
         try:
-            # 使用 requests 下载视频
-            response = requests.get(video['cloudinary_url'], stream=True)
-            response.raise_for_status()  # 确保请求成功
+        #     # 使用 requests 下载视频
+        #     response = requests.get(video['cloudinary_url'], stream=True)
+        #     response.raise_for_status()  # 确保请求成功
             
-            with open(temp_video_path, 'wb') as temp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        temp_file.write(chunk)
+        #     with open(temp_video_path, 'wb') as temp_file:
+        #         for chunk in response.iter_content(chunk_size=8192):
+        #             if chunk:
+        #                 temp_file.write(chunk)
 
             # 使用临时文件路径进行处理
-            scenes = scene_detection(temp_video_path)
-            clip_paths = split_video(temp_video_path, scenes, user_temp_dir)
-            transcript = speech_recognition(temp_video_path)
-            clip_descriptions = generate_clip_descriptions(clip_paths, scenes, num_frames=2)
-            if transcript:
-                clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
-            script_array = generate_script(clip_descriptions)
-            
+            # scenes = scene_detection(temp_video_path)
+            # clip_paths = split_video(temp_video_path, scenes, user_temp_dir)
+            # transcript = speech_recognition(temp_video_path)
+            # clip_descriptions = generate_clip_descriptions(clip_paths, scenes, num_frames=2)
+
+            # if transcript:
+            #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
+
+            # script_array = generate_script(clip_descriptions)
+
+            script_array = []
+            # time = '00:00:00.000'
+            for i in range(6):
+                dic = {'_id': i, 'start_time': '00:00:00.000', 'end_time': '00:00:00.000', 'description': ''}
+                script_array.append(dic)
             for scene in script_array:
                 scene['_id'] = str(ObjectId())
+            # script_array=[{'scene_number': '1', 'start_time': '00:00:00.000', 'end_time': '00:00:00.000', 'description': ''}]
             
             # 保存到数据库
             script_doc = {
@@ -1418,6 +1480,309 @@ def get_scene_chat_history(current_user):
             'success': False,
             'error': f'Request parsing error: {str(e)}'
         }), 500
+
+@app.route('/api/generate/sentences', methods=['POST'])
+def generate_sentences():
+    data = request.json
+    # 处理 style_bias 和 keywords 参数
+    # 调用 OpenAI 接口生成句子
+
+@app.route('/api/ai/scene/description', methods=['POST'])
+@token_required
+def generate_scene_description(current_user):
+    user_temp_dir = None
+    temp_video_path = None
+    try:
+        # 获取参数
+        data = request.get_json()
+        video_id = data.get('video_id')
+        start_time = data.get('start_time'),
+        end_time = data.get('end_time'),
+        creativity = data.get('creativity')
+        
+        print("接收到的参数:", {   
+        'video_id': data.get('video_id'),
+        'start_time': data.get('start_time'),
+        'end_time': data.get('end_time'),
+        'creativity': data.get('creativity')})
+
+        if not video_id:
+            return jsonify({'error': 'Video ID not provided'}), 400
+        
+        # 时间格式验证
+        if not re.match(r'^\d{2}:\d{2}:\d{2}\.\d{3}$', data['start_time']) or \
+            not re.match(r'^\d{2}:\d{2}:\d{2}\.\d{3}$', data['end_time']):
+                return jsonify({'error': '时间格式应为 HH:MM:SS.sss'}), 400
+
+        # 获取视频信息并验证所有权
+        video = videos_collection.find_one({
+            '_id': ObjectId(video_id),
+            'user_id': ObjectId(current_user['_id'])
+        })
+        if not video:
+            return jsonify({'error': 'Video not found or access denied'}), 404
+
+        # 检查 Cloudinary URL
+        if 'cloudinary_url' not in video:
+            return jsonify({'error': 'Video URL not found'}), 404
+            
+        # 创建临时目录
+        user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
+        os.makedirs(user_temp_dir, exist_ok=True)
+
+        # 从 Cloudinary 下载视频到临时文件
+        temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
+        
+        try:
+            # 使用 requests 下载视频
+            response = requests.get(video['cloudinary_url'], stream=True)
+            response.raise_for_status()  # 确保请求成功
+            
+            with open(temp_video_path, 'wb') as temp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        temp_file.write(chunk)
+
+            # 使用临时文件路径进行处理
+            # scene = scene_detection(temp_video_path)
+            clip_path = split_video_segment(temp_video_path, start_time, end_time, user_temp_dir)
+            # transcript = speech_recognition(clip_path)
+            clip_description = generate_clip_description(clip_path, creativity, num_frames=2)
+            # if transcript:
+            #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
+            script_array = generate_script_2(clip_description)
+            
+            # description = script_array
+            print("开始======")
+            print("description是",script_array)
+            print("description的类型是",type(script_array))
+            print("======结束")
+
+            combined_descriptions = []
+            for script in script_array:
+                combined_descriptions.append(script['description'])
+
+            # combined_descriptions = '<br>'.join([script['description'] for script in script_array])
+            print(combined_descriptions)
+            
+            # for scene in script_array:
+            #     scene['_id'] = str(ObjectId())
+            
+            # # 保存到数据库
+            # script_doc = {
+            #     'user_id': ObjectId(current_user['_id']),
+            #     'video_id': ObjectId(video_id),
+            #     'scenes': script_array,
+            #     'created_at': datetime.now(),
+            #     'updated_at': datetime.now()
+            # }
+            
+            # scripts_collection.update_one(
+            #     {
+            #         'video_id': ObjectId(video_id),
+            #         'user_id': ObjectId(current_user['_id'])
+            #     },
+            #     {'$set': script_doc},
+            #     upsert=True
+            # )
+            
+            # videos_collection.update_one(
+            #     {'_id': ObjectId(video_id)},
+            #     {'$set': {'has_script': True}}
+            # )
+
+            return jsonify({
+                'success': True,
+                # 'descriptions': combined_descriptions
+                'descriptions': [
+                    combined_descriptions[0],
+                    combined_descriptions[1],
+                    combined_descriptions[2],
+                    combined_descriptions[3],
+                    combined_descriptions[4]
+                    ]
+
+            })
+
+        except requests.RequestException as e:
+            print(f"Failed to download video: {str(e)}")
+            return jsonify({'error': f'Failed to download video: {str(e)}'}), 500
+        except Exception as e:
+            print(f"Inner processing error: {str(e)}")
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to process video: {str(e)}'}), 500
+
+    except Exception as e:
+        print(f"Script generation error: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': f'Failed to generate script: {str(e)}'}), 500
+
+    finally:
+        # 清理临时文件和目录
+        if temp_video_path and os.path.exists(temp_video_path):
+            try:
+                os.unlink(temp_video_path)
+            except Exception as e:
+                print(f"Failed to delete temp video file: {str(e)}")
+                
+        if user_temp_dir and os.path.exists(user_temp_dir):
+            try:
+                shutil.rmtree(user_temp_dir)
+            except Exception as e:
+                print(f"Failed to clean up temp directory: {str(e)}")
+
+@app.route('/api/ai/scene/description2', methods=['POST'])
+@token_required
+def generate_scene_description2(current_user):
+    user_temp_dir = None
+    temp_video_path = None
+    try:
+        # 获取参数
+        data = request.get_json()      
+        video_id = data.get('video_id')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        creativity = data.get('creativity')  # 0-10值
+        selected_keywords = data.get('selected_keywords', [])  # 用户选择的风格按钮
+        additional_instructions = data.get('additional_instructions', '')  # 用户输入内容
+
+
+        print("接收到的参数:", {   
+        'video_id': data.get('video_id'),
+        'start_time': data.get('start_time'),
+        'end_time': data.get('end_time'),
+        'creativity': data.get('creativity'),
+        'selected_keywords':data.get('selected_keywords', []),
+        'additional_instructions':data.get('additional_instructions', '')
+        })
+
+        if not video_id:
+            return jsonify({'error': 'Video ID not provided'}), 400
+        
+        # 时间格式验证
+        # if not re.match(r'^\d{2}:\d{2}:\d{2}\.\d{3}$', data['start_time']) or \
+        #     not re.match(r'^\d{2}:\d{2}:\d{2}\.\d{3}$', data['end_time']):
+        #         return jsonify({'error': '时间格式应为 HH:MM:SS.sss'}), 400
+
+        # 获取视频信息并验证所有权
+        video = videos_collection.find_one({
+            '_id': ObjectId(video_id),
+            'user_id': ObjectId(current_user['_id'])
+        })
+        if not video:
+            return jsonify({'error': 'Video not found or access denied'}), 404
+
+        # 检查 Cloudinary URL
+        if 'cloudinary_url' not in video:
+            return jsonify({'error': 'Video URL not found'}), 404
+            
+        # 创建临时目录
+        user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
+        os.makedirs(user_temp_dir, exist_ok=True)
+
+        # 从 Cloudinary 下载视频到临时文件
+        temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
+        
+        try:
+            # 使用 requests 下载视频
+            response = requests.get(video['cloudinary_url'], stream=True)
+            response.raise_for_status()  # 确保请求成功
+            
+            with open(temp_video_path, 'wb') as temp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        temp_file.write(chunk)
+
+            # 使用临时文件路径进行处理
+            # scene = scene_detection(temp_video_path)
+            clip_path = split_video_segment(temp_video_path, start_time, end_time, user_temp_dir)
+            # transcript = speech_recognition(clip_path)
+            clip_description = generate_clip_description(clip_path, creativity, num_frames=2)
+            # if transcript:
+            #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
+            script_array = generate_script_with_instruction(clip_description,selected_keywords,additional_instructions)
+            
+            # description = script_array
+            print("开始======")
+            print("description是",script_array)
+            print("description的类型是",type(script_array))
+            print("======结束")
+
+            combined_descriptions = []
+            for script in script_array:
+                combined_descriptions.append(script['description'])
+
+            # combined_descriptions = '<br>'.join([script['description'] for script in script_array])
+            print(combined_descriptions)
+            
+            # for scene in script_array:
+            #     scene['_id'] = str(ObjectId())
+            
+            # # 保存到数据库
+            # script_doc = {
+            #     'user_id': ObjectId(current_user['_id']),
+            #     'video_id': ObjectId(video_id),
+            #     'scenes': script_array,
+            #     'created_at': datetime.now(),
+            #     'updated_at': datetime.now()
+            # }
+            
+            # scripts_collection.update_one(
+            #     {
+            #         'video_id': ObjectId(video_id),
+            #         'user_id': ObjectId(current_user['_id'])
+            #     },
+            #     {'$set': script_doc},
+            #     upsert=True
+            # )
+            
+            # videos_collection.update_one(
+            #     {'_id': ObjectId(video_id)},
+            #     {'$set': {'has_script': True}}
+            # )
+
+            return jsonify({
+                'success': True,
+                # 'descriptions': combined_descriptions
+                'descriptions': [
+                    combined_descriptions[0],
+                    combined_descriptions[1],
+                    combined_descriptions[2],
+                    combined_descriptions[3],
+                    combined_descriptions[4]
+                    ]
+
+            })
+
+        except requests.RequestException as e:
+            print(f"Failed to download video: {str(e)}")
+            return jsonify({'error': f'Failed to download video: {str(e)}'}), 500
+        except Exception as e:
+            print(f"Inner processing error: {str(e)}")
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to process video: {str(e)}'}), 500
+
+    except Exception as e:
+        print(f"Script generation error: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': f'Failed to generate script: {str(e)}'}), 500
+
+    finally:
+        # 清理临时文件和目录
+        if temp_video_path and os.path.exists(temp_video_path):
+            try:
+                os.unlink(temp_video_path)
+            except Exception as e:
+                print(f"Failed to delete temp video file: {str(e)}")
+                
+        if user_temp_dir and os.path.exists(user_temp_dir):
+            try:
+                shutil.rmtree(user_temp_dir)
+            except Exception as e:
+                print(f"Failed to clean up temp directory: {str(e)}")
+
+
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5002))
