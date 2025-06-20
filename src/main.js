@@ -8,7 +8,7 @@ import router from './router'
 
 // 配置 axios
 const axiosInstance = axios.create({
-    baseURL: 'http://localhost:5002',  
+    baseURL: 'https://haiad-backend.onrender.com',  
     // https://haiad-backend.onrender.com 
     // http://localhost:5002你的后端 API 地址
     timeout: 600000,  // 10分钟
@@ -19,7 +19,7 @@ const axiosInstance = axios.create({
 
 // 为上传请求创建特殊的实例
 const uploadInstance = axios.create({
-    baseURL: 'http://localhost:5002',
+    baseURL: 'https://haiad-backend.onrender.com',
     timeout: 3600000,  // 1小时
     headers: {
         'Content-Type': 'multipart/form-data'
