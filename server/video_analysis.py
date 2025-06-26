@@ -17,6 +17,7 @@ import ssl
 from urllib3.util.ssl_ import create_urllib3_context
 from urllib3.util.retry import Retry
 from datetime import datetime
+import time
 
 import certifi
 from requests.adapters import HTTPAdapter
@@ -203,44 +204,99 @@ def generate_clip_descriptions(clip_paths, scenes, num_frames=2):
         print(f"Generate clip description error: {str(e)}")
         return "Cannot generate scene description."
 
-def generate_clip_description(clip_path, creativity, num_frames=2):
+# def generate_clip_description(clip_path, creativity, num_frames=2):
+#     try:
+#         descriptions = []
+#         # for clip_path, scene in zip(clip_paths, scenes):
+#         clip = VideoFileClip(clip_path)
+#         frames = sample_frames(clip, num_frames)
+#         images = [Image.fromarray(frame) for frame in frames]
+#         image_files = [convert_to_base64(image) for image in images]
+        
+#         content = []
+#         prompt = ("You are an expert in understanding scene transitions based on visual features in a video. "
+#                     "For the given sequence of images per timestamp, identify the scence in the video. "
+#                     "Generate pure audio description for the scene with time ranges.\n"
+#                     # f"{scene}"
+#         )
+        
+#         content.append({"type": "text", "text": prompt})
+#         for image_file in image_files:
+#             content.append({
+#                 "type": "image_url",
+#                 "image_url": {"url": f"data:image/jpeg;base64,{image_file}"}
+#             })
+        
+#         response = client.chat.completions.create(
+#             model="gpt-4o-mini",
+#             messages=[{"role": "user", "content": content}],
+#             temperature= creativity,
+#             max_tokens=1000,
+#         )
+        
+#         descriptions.append(response.choices[0].message.content)
+#         clip.close()
+            
+#         return "".join(descriptions)
+#     except Exception as e:
+#         print(f"Generate clip description error: {str(e)}")
+#         return "Cannot generate scene description."
+    
+
+# 杨瑞霞修改代码
+def generate_clip_description(clip_path, creativity, num_frames=2, max_retries=100):
+    def call_with_limit(content, max_retries):
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": content}],
+                    temperature=creativity,
+                    max_tokens=1000,
+                )
+                message = response.choices[0].message.content
+                if message:
+                    return message
+                else:
+                    raise ValueError("Empty response content.")
+            except Exception as e:
+                attempt += 1
+                print(f"[Retry {attempt}/{max_retries}] Error: {str(e)}")
+        raise RuntimeError("Exceeded maximum retry limit.")
+
     try:
         descriptions = []
-        # for clip_path, scene in zip(clip_paths, scenes):
         clip = VideoFileClip(clip_path)
         frames = sample_frames(clip, num_frames)
         images = [Image.fromarray(frame) for frame in frames]
         image_files = [convert_to_base64(image) for image in images]
-        
+
         content = []
-        prompt = ("You are an expert in understanding scene transitions based on visual features in a video. "
-                    "For the given sequence of images per timestamp, identify the scence in the video. "
-                    "Generate pure audio description for the scene with time ranges.\n"
-                    # f"{scene}"
+        prompt = (
+            "You are an expert in understanding scene transitions based on visual features in a video. "
+            "For the given sequence of images per timestamp, identify the scene in the video. "
+            "Generate pure audio description for the scene with time ranges.\n"
         )
-        
+
         content.append({"type": "text", "text": prompt})
         for image_file in image_files:
             content.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:image/jpeg;base64,{image_file}"}
             })
-        
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": content}],
-            temperature= creativity,
-            max_tokens=1000,
-        )
-        
-        descriptions.append(response.choices[0].message.content)
+
+        description = call_with_limit(content, max_retries)
+        descriptions.append(description)
         clip.close()
-            
         return "".join(descriptions)
+
     except Exception as e:
         print(f"Generate clip description error: {str(e)}")
         return "Cannot generate scene description."
-    
+
+
+
 def generate_script(clip_descriptions):
     try:
         prompt = ("You are an expert at understanding audio descriptions of different scenes in a video. "
@@ -314,71 +370,129 @@ def generate_script(clip_descriptions):
         return [] 
 
 
-def generate_script_2(clip_descriptions):
-    try:
-        prompt = ("You are an expert at understanding audio descriptions of different scenes in a video. "
-            "Please generate five full audio descriptions  of the scene in different styles for the following scene and keep each audio description within one short sentence. "
-            "And provide the five different audio description as a Python List of dictionaries, where each dictionary contains: \n"
-            "{description_number (str), start_time (str, format: HH:MM:SS.mmm), end_time (str, format: HH:MM:SS.mmm), description (str)] \n\n"
-            "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"        )     
-        prompt += "\n\n".join(clip_descriptions)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            max_tokens=10000
-        )
+# def generate_script_2(clip_descriptions):
+#     try:
+#         prompt = ("You are an expert at understanding audio descriptions of different scenes in a video. "
+#             "Please generate five full audio descriptions  of the scene in different styles for the following scene and keep each audio description within one short sentence. "
+#             "And provide the five different audio description as a Python List of dictionaries, where each dictionary contains: \n"
+#             "{description_number (str), start_time (str, format: HH:MM:SS.mmm), end_time (str, format: HH:MM:SS.mmm), description (str)] \n\n"
+#             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"        )     
+#         prompt += "\n\n".join(clip_descriptions)
+#         response = client.chat.completions.create(
+#             model="gpt-4o-mini",
+#             messages=[{"role": "user", "content": prompt}],
+#             temperature=0,
+#             max_tokens=10000
+#         )
 
-        # 直接执行返回的 Python 代码
-        script_text = response.choices[0].message.content
-        print (script_text)
+#         # 直接执行返回的 Python 代码
+#         script_text = response.choices[0].message.content
+#         print (script_text)
         
-        # 如果返回的文本包含 Python 代码块标记，去除它
-        if "```python" in script_text:
-            script_text = script_text.split("```python")[1].split("```")[0].strip()
-        elif "```" in script_text:
-            script_text = script_text.split("```")[1].split("```")[0].strip()
-        else:
-            script_text = response.strip()
+#         # 如果返回的文本包含 Python 代码块标记，去除它
+#         if "```python" in script_text:
+#             script_text = script_text.split("```python")[1].split("```")[0].strip()
+#         elif "```" in script_text:
+#             script_text = script_text.split("```")[1].split("```")[0].strip()
+#         else:
+#             script_text = response.strip()
             
-        print(script_text)
-        script_array = eval(script_text)  # 直接执行 Python 代码返回数组
-        print (script_array)
-        return script_array
+#         print(script_text)
+#         script_array = eval(script_text)  # 直接执行 Python 代码返回数组
+#         print (script_array)
+#         return script_array
         
-        # if not isinstance(script_array, list):
-        #     raise ValueError("Response is not a list")
+#         # if not isinstance(script_array, list):
+#         #     raise ValueError("Response is not a list")
         
-        # normalized_scenes = []
-        # for i, scene in enumerate(script_array, 1):
-        #     # 创建新的字典对象
-        #     normalized_scene = dict()
+#         # normalized_scenes = []
+#         # for i, scene in enumerate(script_array, 1):
+#         #     # 创建新的字典对象
+#         #     normalized_scene = dict()
                 
-        #     # 设置场景编号
-        #     if isinstance(scene.get('scene_number'), str):
-        #         try:
-        #             scene_number = int(scene['scene_number'].split()[-1])
-        #         except:
-        #             scene_number = i
-        #     else:
-        #         scene_number = scene.get('scene_number', i)
+#         #     # 设置场景编号
+#         #     if isinstance(scene.get('scene_number'), str):
+#         #         try:
+#         #             scene_number = int(scene['scene_number'].split()[-1])
+#         #         except:
+#         #             scene_number = i
+#         #     else:
+#         #         scene_number = scene.get('scene_number', i)
                 
-        #     # 构建标准化的场景字典
-        #     normalized_scene['scene_number'] = scene_number
-        #     normalized_scene['start_time'] = scene.get('start_time')
-        #     normalized_scene['end_time'] = scene.get('end_time')
-        #     normalized_scene['description'] = scene.get('description')
+#         #     # 构建标准化的场景字典
+#         #     normalized_scene['scene_number'] = scene_number
+#         #     normalized_scene['start_time'] = scene.get('start_time')
+#         #     normalized_scene['end_time'] = scene.get('end_time')
+#         #     normalized_scene['description'] = scene.get('description')
                 
-        #     normalized_scenes.append(normalized_scene)
+#         #     normalized_scenes.append(normalized_scene)
             
-        # if not normalized_scenes:
-        #     raise ValueError("No valid scenes found")
+#         # if not normalized_scenes:
+#         #     raise ValueError("No valid scenes found")
                 
-        # return normalized_scenes
+#         # return normalized_scenes
     
+#     except Exception as e:
+#         print(f"Generate script error: {str(e)}")
+#         return [] 
+
+
+# 杨瑞霞修改代码
+def generate_script_2(clip_descriptions, max_retries=100):
+    def call_with_retry(prompt, max_retries):
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                    max_tokens=10000
+                )
+                script_text = response.choices[0].message.content
+                print("Raw response:\n", script_text)
+
+                # 去除 ```python ``` 或 ``` 标记
+                if "```python" in script_text:
+                    script_text = script_text.split("```python")[1].split("```")[0].strip()
+                elif "```" in script_text:
+                    script_text = script_text.split("```")[1].split("```")[0].strip()
+
+                # 解析为 Python 对象
+                script_array = eval(script_text)
+
+                # 检查是否为 list 且包含 dict
+                if isinstance(script_array, list) and all(isinstance(item, dict) for item in script_array):
+                    return script_array
+                else:
+                    raise ValueError("Response is not a valid list of dictionaries")
+
+            except Exception as e:
+                attempt += 1
+                print(f"[Retry {attempt}/{max_retries}] Error: {str(e)}")
+
+        raise RuntimeError("Exceeded maximum retry attempts for script generation.")
+
+    try:
+        prompt = (
+            "You are an expert at understanding audio descriptions of different scenes in a video. "
+            "Please generate five full audio descriptions of the scene in different styles for the following scene "
+            "and keep each audio description within one short sentence. "
+            "And provide the five different audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
+            "{description_number (str), start_time (str, format: HH:MM:SS.mmm), end_time (str, format: HH:MM:SS.mmm), description (str)} \n\n"
+            "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
+        )
+        prompt += "\n\n".join(clip_descriptions)
+
+        return call_with_retry(prompt, max_retries)
+
     except Exception as e:
         print(f"Generate script error: {str(e)}")
-        return [] 
+        return []
+
+
+
+
 
 # # 新增时间格式校验函数
 # def time_to_seconds(time_str):
@@ -579,76 +693,135 @@ def generate_descriptions(clip_path, temperature=0.5):
 
 
 
-def generate_script_with_instruction(clip_descriptions,selected_keywords,additional_instructions):
-    try:
-        prompt = ("You are an expert at understanding audio descriptions of different scenes in a video. "
-            "Please generate five full audio descriptions  of the scene in different styles for the following scene and keep each audio description within one short sentence. "
-            "And provide the five different audio description as a Python List of dictionaries, where each dictionary contains: \n"
-            "{description_number (str), start_time (str, format: HH:MM:SS.mmm), end_time (str, format: HH:MM:SS.mmm), description (str)] \n\n"
-            "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"        )     
+# def generate_script_with_instruction(clip_descriptions,selected_keywords,additional_instructions):
+#     try:
+#         prompt = ("You are an expert at understanding audio descriptions of different scenes in a video. "
+#             "Please generate five full audio descriptions  of the scene in different styles for the following scene and keep each audio description within one short sentence. "
+#             "And provide the five different audio description as a Python List of dictionaries, where each dictionary contains: \n"
+#             "{description_number (str), start_time (str, format: HH:MM:SS.mmm), end_time (str, format: HH:MM:SS.mmm), description (str)] \n\n"
+#             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"        )     
 
         
-        prompt += "\n\n".join(clip_descriptions)
-        prompt += "\n\n The style should be:".join(selected_keywords)
-        prompt += "\n\n The other requirements: ".join(additional_instructions)
+#         prompt += "\n\n".join(clip_descriptions)
+#         prompt += "\n\n The style should be:".join(selected_keywords)
+#         prompt += "\n\n The other requirements: ".join(additional_instructions)
 
 
 
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            max_tokens=10000
+#         response = client.chat.completions.create(
+#             model="gpt-4o-mini",
+#             messages=[{"role": "user", "content": prompt}],
+#             temperature=0,
+#             max_tokens=10000
+#         )
+
+#         # 直接执行返回的 Python 代码
+#         script_text = response.choices[0].message.content
+#         print (script_text)
+        
+#         # 如果返回的文本包含 Python 代码块标记，去除它
+#         if "```python" in script_text:
+#             script_text = script_text.split("```python")[1].split("```")[0].strip()
+#         elif "```" in script_text:
+#             script_text = script_text.split("```")[1].split("```")[0].strip()
+#         else:
+#             script_text = response.strip()
+            
+#         print(script_text)
+#         script_array = eval(script_text)  # 直接执行 Python 代码返回数组
+#         print (script_array)
+#         return script_array
+        
+#         # if not isinstance(script_array, list):
+#         #     raise ValueError("Response is not a list")
+        
+#         # normalized_scenes = []
+#         # for i, scene in enumerate(script_array, 1):
+#         #     # 创建新的字典对象
+#         #     normalized_scene = dict()
+                
+#         #     # 设置场景编号
+#         #     if isinstance(scene.get('scene_number'), str):
+#         #         try:
+#         #             scene_number = int(scene['scene_number'].split()[-1])
+#         #         except:
+#         #             scene_number = i
+#         #     else:
+#         #         scene_number = scene.get('scene_number', i)
+                
+#         #     # 构建标准化的场景字典
+#         #     normalized_scene['scene_number'] = scene_number
+#         #     normalized_scene['start_time'] = scene.get('start_time')
+#         #     normalized_scene['end_time'] = scene.get('end_time')
+#         #     normalized_scene['description'] = scene.get('description')
+                
+#         #     normalized_scenes.append(normalized_scene)
+            
+#         # if not normalized_scenes:
+#         #     raise ValueError("No valid scenes found")
+                
+#         # return normalized_scenes
+    
+#     except Exception as e:
+#         print(f"Generate script error: {str(e)}")
+#         return [] 
+
+# 杨瑞霞修改代码
+def generate_script_with_instruction(clip_descriptions, selected_keywords, additional_instructions, max_retries=100):
+    def call_with_retry(prompt, max_retries):
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                    max_tokens=10000
+                )
+                script_text = response.choices[0].message.content
+                print("Raw response:\n", script_text)
+
+                # 清理代码块标记
+                if "```python" in script_text:
+                    script_text = script_text.split("```python")[1].split("```")[0].strip()
+                elif "```" in script_text:
+                    script_text = script_text.split("```")[1].split("```")[0].strip()
+
+                # 尝试 eval
+                script_array = eval(script_text)
+
+                if isinstance(script_array, list) and all(isinstance(item, dict) for item in script_array):
+                    return script_array
+                else:
+                    raise ValueError("Response is not a valid list of dictionaries")
+
+            except Exception as e:
+                attempt += 1
+                print(f"[Retry {attempt}/{max_retries}] Error: {str(e)}")
+
+        raise RuntimeError("Exceeded maximum retry attempts.")
+
+    try:
+        # 构建 prompt
+        prompt = (
+            "You are an expert at understanding audio descriptions of different scenes in a video. "
+            "Please generate five full audio descriptions of the scene in different styles for the following scene "
+            "and keep each audio description within one short sentence. "
+            "And provide the five different audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
+            "{description_number (str), start_time (str, format: HH:MM:SS.mmm), end_time (str, format: HH:MM:SS.mmm), description (str)} \n\n"
+            "Please return the Python List of dictionaries as the final output and do not add any additional information.\n\n"
         )
 
-        # 直接执行返回的 Python 代码
-        script_text = response.choices[0].message.content
-        print (script_text)
-        
-        # 如果返回的文本包含 Python 代码块标记，去除它
-        if "```python" in script_text:
-            script_text = script_text.split("```python")[1].split("```")[0].strip()
-        elif "```" in script_text:
-            script_text = script_text.split("```")[1].split("```")[0].strip()
-        else:
-            script_text = response.strip()
-            
-        print(script_text)
-        script_array = eval(script_text)  # 直接执行 Python 代码返回数组
-        print (script_array)
-        return script_array
-        
-        # if not isinstance(script_array, list):
-        #     raise ValueError("Response is not a list")
-        
-        # normalized_scenes = []
-        # for i, scene in enumerate(script_array, 1):
-        #     # 创建新的字典对象
-        #     normalized_scene = dict()
-                
-        #     # 设置场景编号
-        #     if isinstance(scene.get('scene_number'), str):
-        #         try:
-        #             scene_number = int(scene['scene_number'].split()[-1])
-        #         except:
-        #             scene_number = i
-        #     else:
-        #         scene_number = scene.get('scene_number', i)
-                
-        #     # 构建标准化的场景字典
-        #     normalized_scene['scene_number'] = scene_number
-        #     normalized_scene['start_time'] = scene.get('start_time')
-        #     normalized_scene['end_time'] = scene.get('end_time')
-        #     normalized_scene['description'] = scene.get('description')
-                
-        #     normalized_scenes.append(normalized_scene)
-            
-        # if not normalized_scenes:
-        #     raise ValueError("No valid scenes found")
-                
-        # return normalized_scenes
-    
+        prompt += "\n\n".join(clip_descriptions)
+        if selected_keywords:
+            prompt += "\n\nThe style should be:\n" + ", ".join(selected_keywords)
+        if additional_instructions:
+            prompt += "\n\nOther requirements:\n" + "\n".join(additional_instructions)
+
+        return call_with_retry(prompt, max_retries)
+
     except Exception as e:
         print(f"Generate script error: {str(e)}")
-        return [] 
+        return []
+
