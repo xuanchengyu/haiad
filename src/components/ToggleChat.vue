@@ -103,9 +103,26 @@
         </div> -->
 
         <!-- 替换原有的描述显示部分 -->
-        <div v-if="isLoadingRequest" class="loading-indicator">
+        <!-- <div v-if="isLoadingRequest" class="loading-indicator">
           <p>Generating...</p>
-        </div>
+        </div> -->
+        <div v-if="isLoadingRequest" class="loading-indicator">
+  <div class="spinner-container">
+    <div class="spinner"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+    <div class="spinner-blade"></div>
+  </div>
+  <p class="loading-text">Generating descriptions...</p>
+</div>
 
         <!-- <div v-else>
           <div v-for="(desc, index) in descriptions" :key="index" class="desc-item">
@@ -132,7 +149,7 @@
       <!-- 2. Giving your instructions -->
       <div v-if="activeTab === 'generate'" class="control-panel">
       <div class="sentence-style-control">
-        <h4 class="slider-title">测试测试What linguistic feature do you want?</h4>
+        <h4 class="slider-title">What linguistic feature do you want?</h4>
         <div class="slider-container">
           <input
             type="range"
@@ -193,8 +210,26 @@
 
         
         <!-- 替换原有的描述显示部分 -->
-        <div v-if="isLoadingGenerate" class="loading-indicator">
+        <!-- <div v-if="isLoadingGenerate" class="loading-indicator">
           <p>Generating...</p>
+        </div> -->
+
+        <div v-if="isLoadingGenerate" class="loading-indicator">
+          <div class="spinner-container">
+            <div class="spinner"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+            <div class="spinner-blade"></div>
+          </div>
+          <p class="loading-text">Generating descriptions...</p>
         </div>
 
         <!-- <div v-else>
@@ -208,7 +243,7 @@
             <button 
               @click="selectDescription(desc)" 
               class="desc-btn"
-            >描述：{{ desc }}</button>
+            >{{ desc }}</button>
           </div>
         </div>
 
@@ -922,4 +957,82 @@ h3 {
     right: -100%;
   }
 }
+
+
+
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 0;
+  margin: 20px 0;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.spinner-container {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  margin-bottom: 16px;
+}
+
+.spinner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(33, 150, 243, 0.1);
+  border-radius: 50%;
+}
+
+.spinner-blade {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 6px;
+  height: 15px;
+  margin-left: -3px;
+  background: #2196f3;
+  border-radius: 4px;
+  opacity: 0;
+  animation: spinner-fade 1s linear infinite;
+}
+
+.spinner-blade:nth-child(2) { transform: rotate(30deg); animation-delay: -0.916s; }
+.spinner-blade:nth-child(3) { transform: rotate(60deg); animation-delay: -0.833s; }
+.spinner-blade:nth-child(4) { transform: rotate(90deg); animation-delay: -0.75s; }
+.spinner-blade:nth-child(5) { transform: rotate(120deg); animation-delay: -0.666s; }
+.spinner-blade:nth-child(6) { transform: rotate(150deg); animation-delay: -0.583s; }
+.spinner-blade:nth-child(7) { transform: rotate(180deg); animation-delay: -0.5s; }
+.spinner-blade:nth-child(8) { transform: rotate(210deg); animation-delay: -0.416s; }
+.spinner-blade:nth-child(9) { transform: rotate(240deg); animation-delay: -0.333s; }
+.spinner-blade:nth-child(10) { transform: rotate(270deg); animation-delay: -0.25s; }
+.spinner-blade:nth-child(11) { transform: rotate(300deg); animation-delay: -0.166s; }
+.spinner-blade:nth-child(12) { transform: rotate(330deg); animation-delay: -0.083s; }
+
+@keyframes spinner-fade {
+  0% { opacity: 0.1; }
+  50% { opacity: 1; }
+  100% { opacity: 0.1; }
+}
+
+.loading-text {
+  font-size: 14px;
+  color: #2196f3;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-align: center;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
 </style>
