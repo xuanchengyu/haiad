@@ -19,7 +19,7 @@ const axiosInstance = axios.create({
 
 // 为上传请求创建特殊的实例
 const uploadInstance = axios.create({
-    baseURL: 'http://localhost:5002',
+    baseURL: 'https://haiad-backend.onrender.com',
     timeout: 3600000,  // 1小时
     headers: {
         'Content-Type': 'multipart/form-data'
