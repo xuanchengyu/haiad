@@ -26,8 +26,9 @@ import re
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
 # from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions,generate_script,split_video_segment,generate_descriptions
+from .video_analysis import generate_clip_description,split_video_segment,generate_script_2,generate_script_with_instruction
 
-from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_clip_description,generate_script,split_video_segment,generate_descriptions,generate_script_2,generate_script_with_instruction
+# from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_clip_description,generate_script,split_video_segment,generate_descriptions,generate_script_2,generate_script_with_instruction
 # from ..draft.ai_assistant import chat_with_ai
 # from .toggle_chat import handle_scene_chat
 
@@ -1515,6 +1516,19 @@ def generate_scene_description(current_user):
             #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
             script_array = generate_script_2(clip_description)
             
+
+
+
+            print("切片路径开始===")
+            print("切片路径是：",clip_path)
+            print("切片路径结束===")
+
+
+            print("音频描述开始======")
+            print("音频描述是",clip_description)
+            print("音频描述结束======")
+
+
             # description = script_array
             print("开始======")
             print("description是",script_array)
