@@ -25,11 +25,10 @@ from base64 import b64decode
 import re
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
-# from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions,generate_script,split_video_segment,generate_descriptions
-from .video_analysis import generate_clip_description,split_video_segment,generate_script_2,generate_script_with_instruction
+from .video_analysis import generate_clip_description, split_video_segment, generate_script_2, generate_script_with_instruction, frame_number
 
 # from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_clip_description,generate_script,split_video_segment,generate_descriptions,generate_script_2,generate_script_with_instruction
-# from ..draft.ai_assistant import chat_with_ai
+# from .draft.ai_assistant import chat_with_ai
 # from .toggle_chat import handle_scene_chat
 
 # ============================
@@ -114,7 +113,6 @@ chat_logging_collection = db['chat_logging']  # 存储LOG日志
 
 app = Flask(__name__)
 CORS(app)
-
 
 @app.route("/")
 def home():
@@ -230,7 +228,7 @@ def generate_thumbnail(current_user, file, video_id):
             upload_result = cloudinary.uploader.upload(
                 img_byte_arr,
                 folder=f"users/{str(current_user['_id'])}/thumbnails",
-                public_id=f"thumb_{video_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                public_id=f"thumb_{video_id}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}",
                 resource_type="image"
             )
 
@@ -283,7 +281,7 @@ def upload_video(current_user):
                     file,
                     resource_type="video",
                     folder=f"users/{str(current_user['_id'])}/videos",
-                    public_id=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename.rsplit('.', 1)[0]}",  # 移除扩展名
+                    public_id=f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{filename.rsplit('.', 1)[0]}",  # 移除扩展名
                     overwrite=True,
                     chunk_size=6000000,
                     eager=[
@@ -302,7 +300,7 @@ def upload_video(current_user):
                     'user_id': ObjectId(current_user['_id']),
                     'filename': filename,
                     'original_filename': file.filename,
-                    'created_at': datetime.now(),
+                    'created_at': datetime.now(UTC),
                     'has_script': False,
                     'cloudinary_public_id': upload_result['public_id'],
                     'cloudinary_url': upload_result['secure_url'],
@@ -478,7 +476,7 @@ def get_videos(current_user):
         print(f"Error in get_videos: {str(e)}")
         return jsonify({'success': False, 'error': f'获取视频列表失败: {str(e)}'}), 500
 
-# 分析视频 & 生成初始脚本
+# 生成初始6个空场景
 @app.route('/api/generatescript', methods=['POST'])
 @token_required
 def generate_script_endpoint(current_user):
@@ -489,7 +487,6 @@ def generate_script_endpoint(current_user):
         video_id = data.get('video_id')
         if not video_id:
             return jsonify({'error': 'Video ID not provided'}), 400
-        
         
         try:
 
@@ -507,8 +504,8 @@ def generate_script_endpoint(current_user):
                 'user_id': ObjectId(current_user['_id']),
                 'video_id': ObjectId(video_id),
                 'scenes': script_array,
-                'created_at': datetime.now(),
-                'updated_at': datetime.now()
+                'created_at': datetime.now(UTC),
+                'updated_at': datetime.now(UTC)
             }
             
             scripts_collection.update_one(
@@ -593,7 +590,7 @@ def download_script(current_user, video_id):
         doc_io.seek(0)
         
         # 生成文件名：AD script_时间戳
-        filename = f'AD_script_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
+        filename = f'AD_script_{datetime.now(UTC).strftime("%Y%m%d_%H%M%S")}.docx'
         
         return send_file(
             doc_io,
@@ -795,7 +792,7 @@ def delete_scene(current_user, video_id, scene_id):
             {
                 '$set': {
                     'scenes': updated_scenes,
-                    'updated_at': datetime.now()
+                    'updated_at': datetime.now(UTC)
                 }
             }
         )
@@ -834,8 +831,8 @@ def save_script(current_user, video_id):
                 'video_id': ObjectId(video_id),
                 'scenes': scenes,
                 'content': '',  # 可以根据需要从scenes生成content
-                'created_at': datetime.now(),
-                'updated_at': datetime.now()
+                'created_at': datetime.now(UTC),
+                'updated_at': datetime.now(UTC)
             }
             
             # 创建用户脚本目录
@@ -858,7 +855,7 @@ def save_script(current_user, video_id):
             # 更新现有脚本
             update_data = {
                 'scenes': scenes,
-                'updated_at': datetime.now()
+                'updated_at': datetime.now(UTC)
             }
             
             result = scripts_collection.update_one(
@@ -941,8 +938,8 @@ def register():
         user = {
             'username': username,
             'password': hashed_password,
-            'created_at': datetime.now(),
-            'updated_at': datetime.now()
+            'created_at': datetime.now(UTC),
+            'updated_at': datetime.now(UTC)
         }
         
         # 插入用户数据
@@ -1010,447 +1007,6 @@ def login():
         print(f"登录错误: {str(e)}")
         return jsonify({'error': f'登录失败: {str(e)}'}), 500
 
-# # 保存人工编辑的脚本
-# @app.route('/api/videos/<video_id>/human-script', methods=['POST'])
-# @token_required
-# def save_human_script(current_user, video_id):
-#     try:
-#         data = request.json
-#         script_content = data.get('script', '')
-        
-#         # 获取现有脚本或创建新的
-#         script = human_scripts_collection.find_one({
-#             'video_id': ObjectId(video_id),
-#             'user_id': ObjectId(current_user['_id'])
-#         })
-        
-#         if not script:
-#             # 创建新脚本
-#             script_doc = {
-#                 'user_id': ObjectId(current_user['_id']),
-#                 'video_id': ObjectId(video_id),
-#                 'content': script_content,
-#                 'created_at': datetime.now(),
-#                 'updated_at': datetime.now()
-#             }
-#             result = human_scripts_collection.insert_one(script_doc)
-#             success = bool(result.inserted_id)
-#         else:
-#             # 更新现有脚本
-#             update_data = {
-#                 'content': script_content,
-#                 'updated_at': datetime.now()
-#             }
-            
-#             result = human_scripts_collection.update_one(
-#                 {
-#                     'video_id': ObjectId(video_id),
-#                     'user_id': ObjectId(current_user['_id'])
-#                 },
-#                 {'$set': update_data}
-#             )
-#             success = result.modified_count > 0
-        
-#         if success:
-#             return jsonify({'success': True})
-#         return jsonify({'error': '保存脚本失败'}), 500
-        
-#     except Exception as e:
-#         print(f"保存脚本时出错: {str(e)}")
-#         return jsonify({'error': f'保存脚本失败: {str(e)}'}), 500
-
-# # 下载人工编辑的脚本
-# @app.route('/api/videos/<video_id>/human-script/download', methods=['GET'])
-# @token_required
-# def download_human_script(current_user, video_id):
-#     try:
-#         # 从人工脚本集合中获取脚本
-#         script = human_scripts_collection.find_one({
-#             'video_id': ObjectId(video_id),
-#             'user_id': ObjectId(current_user['_id'])
-#         })
-        
-#         if not script:
-#             return jsonify({'error': '脚本不存在'}), 404
-
-#         # 创建word文档
-#         doc = Document()
-        
-#         # 添加标题
-#         doc.add_heading('广告脚本 - 人工编辑版本', 0)
-        
-#         # 添加创建时间
-#         doc.add_paragraph(f'创建时间: {script["created_at"].strftime("%Y-%m-%d %H:%M:%S")}')
-#         doc.add_paragraph(f'最后更新: {script["updated_at"].strftime("%Y-%m-%d %H:%M:%S")}')
-        
-#         # 添加分隔线
-#         doc.add_paragraph('=' * 50)
-        
-#         # 添加脚本内容
-#         doc.add_paragraph(script.get('content', ''))
-        
-#         # 保存到内存中
-#         memory_file = BytesIO()
-#         doc.save(memory_file)
-#         memory_file.seek(0)
-        
-#         return send_file(
-#             memory_file,
-#             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-#             as_attachment=True,
-#             download_name=f'AD_script_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx'
-#         )      
-#     except Exception as e:
-#         print(f"下载脚本时出错: {str(e)}")
-#         return jsonify({'error': f'下载脚本失败: {str(e)}'}), 500
-
-# # 获取人工编辑的脚本
-# @app.route('/api/videos/<video_id>/human-script', methods=['GET'])
-# @token_required
-# def get_human_script(current_user, video_id):
-#     try:
-#         script = human_scripts_collection.find_one({
-#             'video_id': ObjectId(video_id),
-#             'user_id': ObjectId(current_user['_id'])
-#         })
-        
-#         if script:
-#             return jsonify({
-#                 'success': True,
-#                 'content': script.get('content', ''),
-#                 'created_at': script['created_at'].isoformat(),
-#                 'updated_at': script['updated_at'].isoformat()
-#             })
-#         else:
-#             return jsonify({
-#                 'success': True,
-#                 'content': '',
-#                 'created_at': None,
-#                 'updated_at': None
-#             })
-            
-#     except Exception as e:
-#         print(f"获取脚本时出错: {str(e)}")
-#         return jsonify({'error': f'获取脚本失败: {str(e)}'}), 500
-
-# @app.route('/api/chat', methods=['POST'])
-# @token_required
-# def chat(current_user):
-#     try:
-#         data = request.get_json()
-#         message = data.get('message', '').strip()
-#         image_data = data.get('image')  # Base64 图片数据
-
-#         if not message and not image_data:
-#             return jsonify({
-#                 'success': False,
-#                 'error': 'Message or image is required'
-#             }), 400
-
-#         # 处理图片上传
-#         image_url = None
-#         if image_data:
-#             try:
-#                 # 从 Base64 中提取实际的图片数据
-#                 image_data = image_data.split(',')[1] if ',' in image_data else image_data
-#                 image_bytes = b64decode(image_data)
-                
-#                 # 上传到 Cloudinary
-#                 upload_result = cloudinary.uploader.upload(
-#                     io.BytesIO(image_bytes),
-#                     folder=f"users/{str(current_user['_id'])}/chat_images",
-#                     public_id=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_chat_image",
-#                     resource_type="auto",
-#                     overwrite=True
-#                 )
-#                 image_url = upload_result['secure_url']
-#                 print(f"Image uploaded to: {image_url}")
-                
-#             except Exception as e:
-#                 print(f"Error uploading image: {str(e)}")
-#                 return jsonify({
-#                     'success': False,
-#                     'error': f'Image upload failed: {str(e)}'
-#                 }), 500
-
-#         # 保持原有的消息处理逻辑...
-#         history_messages = []
-#         message_count = 0
-#         MAX_MESSAGES = 10
-
-#         chat_history = db.chat_history.find({
-#             'user_id': ObjectId(current_user['_id'])
-#         }).sort('created_at', -1).limit(MAX_MESSAGES)
-
-#         for chat in chat_history:
-#             for msg in reversed(chat.get('messages', [])):
-#                 if message_count >= MAX_MESSAGES:
-#                     break
-                    
-#                 content = msg.get('content', '')
-#                 if isinstance(content, list):
-#                     content = next((item.get('text', '') for item in content if item.get('type') == 'text'), '')
-
-#                 history_messages.append({
-#                     'role': msg.get('role', 'user'),
-#                     'content': content
-#                 })
-#                 message_count += 1
-
-#         # 调用 AI 助手，传入有限的历史记录
-#         try:
-#             result = chat_with_ai(message, image_url, history_messages)
-            
-#             if not result.get('success'):
-#                 print(f"AI assistant error: {result.get('error')}")
-#                 return jsonify({'error': 'Failed to get AI response'}), 500
-
-#             # 保存新对话到数据库
-#             chat_entry = {
-#                 'user_id': ObjectId(current_user['_id']),
-#                 'messages': [
-#                     {
-#                         'role': 'user',
-#                         'content': message,
-#                         'image': image_url,
-#                         'timestamp': datetime.now()
-#                     },
-#                     {
-#                         'role': 'assistant',
-#                         'content': result['response'],
-#                         'timestamp': datetime.now()
-#                     }
-#                 ],
-#                 'created_at': datetime.now()
-#             }
-            
-#             try:
-#                 chat_history_collection.insert_one(chat_entry)
-#             except Exception as save_error:
-#                 print(f"Failed to save chat history: {str(save_error)}")
-#                 # 即使保存失败也返回响应
-#                 return jsonify({
-#                     'success': True,
-#                     'response': result['response']
-#                 })
-
-#             return jsonify({
-#                 'success': True,
-#                 'response': result['response']
-#             })
-            
-#         except Exception as ai_error:
-#             print(f"AI processing error: {str(ai_error)}")
-#             return jsonify({'error': f'AI processing failed: {str(ai_error)}'}), 500
-
-#     except Exception as e:
-#         print(f"General chat endpoint error: {str(e)}")
-#         return jsonify({'error': f'Failed to process chat: {str(e)}'}), 500
-
-# # 添加获取聊天历史的端点
-# @app.route('/api/chat/history', methods=['GET'])
-# @token_required
-# def get_chat_history(current_user):
-#     try:
-#         # 获取用户的聊天历史
-#         history = list(db.chat_history.find(
-#             {'user_id': ObjectId(current_user['_id'])}
-#         ).sort('created_at', -1))  # 按时间倒序排列
-        
-#         # 处理 ObjectId 和时间戳
-#         for chat in history:
-#             # 转换所有 ObjectId 字段为字符串
-#             chat['_id'] = str(chat['_id'])
-#             chat['user_id'] = str(chat['user_id'])
-#             if 'video_id' in chat:
-#                 chat['video_id'] = str(chat['video_id'])
-#             if 'scene_id' in chat:
-#                 chat['scene_id'] = str(chat['scene_id'])
-            
-#             # 转换时间戳
-#             if 'created_at' in chat:
-#                 chat['created_at'] = chat['created_at'].isoformat()
-            
-#             # 处理消息中的时间戳
-#             for message in chat.get('messages', []):
-#                 if 'timestamp' in message:
-#                     message['timestamp'] = message['timestamp'].isoformat()
-                
-#                 # 确保消息内容是可序列化的
-#                 if isinstance(message.get('content'), list):
-#                     for item in message['content']:
-#                         if '_id' in item:
-#                             item['_id'] = str(item['_id'])
-        
-#         print("Processed chat history:", history)  # 添加调试日志
-        
-#         return jsonify({
-#             'success': True,
-#             'history': history
-#         })
-        
-#     except Exception as e:
-#         print(f"Get chat history error: {str(e)}")
-#         return jsonify({
-#             'success': False,
-#             'error': f'Failed to get chat history: {str(e)}'
-#         }), 500
-
-# @app.route('/api/ai/scene/chat', methods=['POST'])
-# @token_required
-# def scene_ai_chat(current_user):
-#     try:
-#         data = request.get_json()
-#         print("Received request data:", data)
-        
-#         # 验证必要的参数
-#         if not all([data.get('video_id'), data.get('scene_id'), data.get('current_text'), data.get('user_message')]):
-#             return jsonify({
-#                 'success': False,
-#                 'error': 'Missing required parameters'
-#             }), 400
-            
-#         try:
-#             # 查找现有的聊天历史
-#             chat_history = db.chat_history.find_one({
-#                 'user_id': ObjectId(current_user['_id']),
-#                 'video_id': ObjectId(data.get('video_id')),
-#                 'scene_id': ObjectId(data.get('scene_id'))
-#             })
-            
-#             # 获取历史消息
-#             chat_histories = chat_history.get('messages', []) if chat_history is not None else []
-            
-#             # 调用 OpenAI 处理函数
-#             result = handle_scene_chat(
-#                 current_text=data.get('current_text'),
-#                 user_message=data.get('user_message'),
-#                 chat_histories=chat_histories
-#             )
-            
-#             if result['success']:
-#                 # 准备新的消息
-#                 new_messages = [
-#                     {
-#                         'role': 'user',
-#                         'content': data.get('user_message'),
-#                         'timestamp': datetime.now(UTC)
-#                     },
-#                     {
-#                         'role': 'assistant',
-#                         'content': result['message'],
-#                         'timestamp': datetime.now(UTC)
-#                     }
-#                 ]
-                
-#                 if chat_history is not None:
-#                     # 更新现有对话
-#                     db.scene_chat_history.update_one(
-#                         {'_id': chat_history['_id']},
-#                         {
-#                             '$push': {
-#                                 'messages': {
-#                                     '$each': new_messages
-#                                 }
-#                             }
-#                         }
-#                     )
-#                 else:
-#                     # 创建新对话
-#                     chat_entry = {
-#                         'user_id': ObjectId(current_user['_id']),
-#                         'video_id': ObjectId(data.get('video_id')),
-#                         'scene_id': ObjectId(data.get('scene_id')),
-#                         'messages': new_messages,
-#                         'created_at': datetime.now(UTC)
-#                     }
-#                     db.scene_chat_history.insert_one(chat_entry)
-            
-#             return jsonify(result)
-            
-#         except Exception as e:
-#             print(f"Database or processing error: {str(e)}")
-#             return jsonify({
-#                 'success': False,
-#                 'error': f'Database or processing error: {str(e)}'
-#             }), 500
-
-#     except Exception as e:
-#         print(f"Request parsing error: {str(e)}")
-#         return jsonify({
-#             'success': False,
-#             'error': f'Request parsing error: {str(e)}'
-#         }), 500
-
-# @app.route('/api/ai/scene/chat/history', methods=['GET'])
-# @token_required
-# def get_scene_chat_history(current_user):
-#     try:
-#         # 获取请求参数
-#         video_id = request.args.get('video_id')
-#         scene_id = request.args.get('scene_id')
-        
-#         # 验证必要的参数
-#         if not all([video_id, scene_id]):
-#             return jsonify({
-#                 'success': False,
-#                 'error': 'Missing required parameters'
-#             }), 400
-            
-#         try:
-#             # 查找聊天历史
-#             chat_history = db.scene_chat_history.find_one({
-#                 'user_id': ObjectId(current_user['_id']),
-#                 'video_id': ObjectId(video_id),
-#                 'scene_id': ObjectId(scene_id)
-#             })
-            
-#             if chat_history:
-#                 # 转换 ObjectId 为字符串
-#                 chat_history['_id'] = str(chat_history['_id'])
-#                 chat_history['user_id'] = str(chat_history['user_id'])
-#                 chat_history['video_id'] = str(chat_history['video_id'])
-#                 chat_history['scene_id'] = str(chat_history['scene_id'])
-                
-#                 # 转换消息中的时间戳
-#                 for message in chat_history['messages']:
-#                     if 'timestamp' in message:
-#                         message['timestamp'] = message['timestamp'].isoformat()
-                
-#                 # 转换创建时间
-#                 if 'created_at' in chat_history:
-#                     chat_history['created_at'] = chat_history['created_at'].isoformat()
-                
-#                 return jsonify({
-#                     'success': True,
-#                     'history': chat_history
-#                 })
-#             else:
-#                 return jsonify({
-#                     'success': True,
-#                     'history': None
-#                 })
-            
-#         except Exception as e:
-#             print(f"Database error: {str(e)}")
-#             return jsonify({
-#                 'success': False,
-#                 'error': f'Database error: {str(e)}'
-#             }), 500
-
-#     except Exception as e:
-#         print(f"Request parsing error: {str(e)}")
-#         return jsonify({
-#             'success': False,
-#             'error': f'Request parsing error: {str(e)}'
-#         }), 500
-
-# @app.route('/api/generate/sentences', methods=['POST'])
-# def generate_sentences():
-#     data = request.json
-#     # 处理 style_bias 和 keywords 参数
-#     # 调用 OpenAI 接口生成句子
-
 @app.route('/api/ai/scene/description', methods=['POST'])
 @token_required
 def generate_scene_description(current_user):
@@ -1460,9 +1016,15 @@ def generate_scene_description(current_user):
         # 获取参数
         data = request.get_json()
         video_id = data.get('video_id')
-        start_time = data.get('start_time'),
-        end_time = data.get('end_time'),
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
         creativity = data.get('creativity')
+        try:
+            creativity = float(creativity)
+        except Exception:
+            print(f"creativity类型转换失败，原始值: {creativity}, 类型: {type(creativity)}，已重置为5.0")
+            creativity = 5.0
+        print(f"creativity的值: {creativity}, 类型: {type(creativity)}")
         
         print("接收到的参数:", {   
         'video_id': data.get('video_id'),
@@ -1510,14 +1072,19 @@ def generate_scene_description(current_user):
             # 使用临时文件路径进行处理
             # scene = scene_detection(temp_video_path)
             clip_path = split_video_segment(temp_video_path, start_time, end_time, user_temp_dir)
+            
+            # 检查视频切片是否成功
+            if not clip_path:
+                return jsonify({'error': 'Failed to split video segment'}), 500
+
+            num_frames = frame_number(start_time, end_time)
+            print("num_frames是",num_frames)
             # transcript = speech_recognition(clip_path)
-            clip_description = generate_clip_description(clip_path, creativity, num_frames=2)
+            clip_description = generate_clip_description(clip_path, creativity, num_frames=num_frames)
             # if transcript:
             #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
             script_array = generate_script_2(clip_description)
             
-
-
 
             print("切片路径开始===")
             print("切片路径是：",clip_path)
@@ -1550,11 +1117,12 @@ def generate_scene_description(current_user):
                 
                 # 创建日志文档
                 log_entry = {
-                    'user_id': data.get('user_id'),
+                    #'user_id': data.get('user_id'),
+                    'user_id': ObjectId(current_user['_id']),
                     'videos_id': data.get('video_id'),
                     'descriptions': combined_descriptions,
                     'description_type': 1,  # 描述类型为1
-                    'time': datetime.datetime.utcnow(),
+                    'time': datetime.now(UTC),
                     'temperature': creativity,
                     'tag': None,
                     'user_input': None
@@ -1644,7 +1212,13 @@ def generate_scene_description2(current_user):
         video_id = data.get('video_id')
         start_time = data.get('start_time')
         end_time = data.get('end_time')
-        creativity = data.get('creativity')  # 0-10值
+        creativity = data.get('creativity', 5)
+        try:
+            creativity = float(creativity)
+        except Exception:
+            print(f"creativity类型转换失败，原始值: {creativity}, 类型: {type(creativity)}，已重置为5.0")
+            creativity = 5.0
+        print(f"creativity的值: {creativity}, 类型: {type(creativity)}")
         selected_keywords = data.get('selected_keywords', [])  # 用户选择的风格按钮
         additional_instructions = data.get('additional_instructions', '')  # 用户输入内容
 
@@ -1698,8 +1272,15 @@ def generate_scene_description2(current_user):
             # 使用临时文件路径进行处理
             # scene = scene_detection(temp_video_path)
             clip_path = split_video_segment(temp_video_path, start_time, end_time, user_temp_dir)
-            # transcript = speech_recognition(clip_path)
-            clip_description = generate_clip_description(clip_path, creativity, num_frames=2)
+            
+            # 检查视频切片是否成功
+            if not clip_path:
+                return jsonify({'error': 'Failed to split video segment'}), 500
+            
+            num_frames = frame_number(start_time, end_time)
+            print("num_frames是",num_frames)
+            # transcript = speech_recognition(clip_path) 
+            clip_description = generate_clip_description(clip_path, creativity, num_frames=num_frames)
             # if transcript:
             #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
             script_array = generate_script_with_instruction(clip_description,selected_keywords,additional_instructions)
@@ -1723,12 +1304,13 @@ def generate_scene_description2(current_user):
 
                 # 创建日志文档
                 log_entry = {
-                    'user_id': data.get('user_id'),
+                    #'user_id': data.get('user_id'),
+                    'user_id': ObjectId(current_user['_id']),
                     'videos_id': data.get('video_id'),
                     'descriptions': combined_descriptions,
                     'description_type': 2,  # 描述类型为2
-                    'time': datetime.datetime.utcnow(),
-                    'temperature': data.get('temperature', 0.7),
+                    'time': datetime.now(UTC),
+                    'temperature': creativity,
                     'tag': selected_keywords,
                     'user_input': additional_instructions
                 }
@@ -1813,4 +1395,3 @@ def generate_scene_description2(current_user):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5002))
     app.run(host='0.0.0.0', port=port, debug=True)
-    
