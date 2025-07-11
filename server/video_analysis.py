@@ -142,9 +142,9 @@ def generate_clip_description(clip_path, creativity, num_frames=2, max_retries=1
         prompt = (
             "You are an expert in analyzing video scenes. "
             "Please analyze the provided images and describe what you see in the scene. "
-            "Write a clear, coherent description in English only. "
+            "Write a clear, coherent description in English only as a single paragraph. "
             "Focus on the visual elements, actions, and atmosphere. "
-            "Keep your response concise and well-structured. "
+            "Keep your response concise and well-structured, and avoid unnecessary line breaks or formatting. "
             "Do not include any code formatting, special characters, or non-English text.\n"
         )
 
