@@ -61,7 +61,7 @@ export default {
       script: '',
       isGenerating: false,
       isSaving: false,
-      hasUnsavedChanges: false,
+      // hasUnsavedChanges: false,
       videoData: {
         video_url: ''
       }
@@ -160,7 +160,7 @@ export default {
     },
     updateScript(newScenes) {
       this.scenes = newScenes;
-      this.hasUnsavedChanges = true;
+      // this.hasUnsavedChanges = true;
     },
     async downloadScript() {
       try {
@@ -239,7 +239,7 @@ async saveAllScenes() {
 
     // 处理结果
     if (failedScenes.length === 0) {
-      this.hasUnsavedChanges = false;
+      // this.hasUnsavedChanges = false;
       ElMessage.success('All scenes saved successfully!');
     } else {
       const errorMessage = failedScenes.map(
@@ -256,10 +256,10 @@ async saveAllScenes() {
   }
 },
     goBack() {
-      if (this.hasUnsavedChanges) {
-        const confirmed = window.confirm('You have unsaved changes. Are you sure you want to leave?');
-        if (!confirmed) return;
-      }
+      // if (this.hasUnsavedChanges) {
+      //   const confirmed = window.confirm('You have unsaved changes. Are you sure you want to leave?');
+      //   if (!confirmed) return;
+      // }
       this.$router.push('/');
     },
     handleSeek(timeStr) {
