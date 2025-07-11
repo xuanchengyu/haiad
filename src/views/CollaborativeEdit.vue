@@ -3,31 +3,13 @@
   <div class="app-container">
     <header class="header">
       <div class="header-left">
-        <button @click="goBack" class="back-btn">
-          Back
-        </button>
-        <h1></h1>
+        <button @click="goBack" class="back-btn">Back</button>
       </div>
       <div class="header-buttons">
-        <button 
-          @click="generateScript" 
-          :disabled="!videoId || isGenerating"
-          class="generate-btn"
-        >
+        <button @click="generateScript" :disabled="!videoId || isGenerating" :class="['nav-btn', { 'active': isGenerating }]">
           {{ isGenerating ? 'Loading...' : 'Start Editing' }}
         </button>
-        <!-- <button 
-          @click="saveAllScenes" 
-          :disabled="!videoId || isSaving || !scenes.length"
-          class="save-btn"
-        >
-          {{ isSaving ? 'Saving...' : 'Save' }}
-        </button> -->
-        <button 
-          @click="downloadScript"
-          :disabled="!scenes.length"
-          class="download-button"
-        >
+        <button @click="downloadScript" :disabled="!scenes.length" class="nav-btn">
           Download
         </button>
       </div>
@@ -51,9 +33,9 @@
         />
       </div>
 
-      <div class="ai-chat-section">
+      <!-- <div class="ai-chat-section">
         <ai-assistant />
-      </div>
+      </div> -->
     </main>
   </div>
 </template>
@@ -297,17 +279,62 @@ async saveAllScenes() {
 }
 
 .header {
-  padding: 1rem;
-  background-color: #f5f5f5;
+  padding: 10px 20px;
+  background: #fff;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin: 0 0 6px 0;
+  min-height: 50px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-btn {
+  padding: 4px 14px;
+  font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  background: #e3f2fd;
+  color: #1976d2;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  outline: none;
+}
+
+.header-btn.primary {
+  background: #1976d2;
+  color: #fff;
+}
+
+.header-btn:disabled,
+.header-btn.primary:disabled {
+  background: #b3c6e6;
+  color: #fff;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.header-btn:not(:disabled):hover {
+  background: #bbdefb;
+  color: #1565c0;
+}
+
+.header-btn.primary:not(:disabled):hover {
+  background: #1565c0;
+  color: #fff;
 }
 
 .main-content {
   flex: 1;
   display: grid;
-  grid-template-columns: 40% 55% 1% !important;
+  grid-template-columns: 30% 40% 1% !important;
   gap: 1rem;
   padding: 1rem;
   overflow: hidden;
@@ -322,61 +349,49 @@ async saveAllScenes() {
 
 .header-buttons {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
-.generate-btn,
-.save-btn,
-.download-button {
-  padding: 8px 16px;
-  background-color: #4CAF50;
-  color: white;
+.nav-btn {
+  background: none;
+  color: #1976d2;
   border: none;
-  border-radius: 4px;
+  border-radius: 12px;
+  padding: 6px 20px;
+  font-size: 15px;
   cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  outline: none;
 }
 
-.generate-btn:disabled {
-  background-color: #cccccc;
+.nav-btn.active,
+.nav-btn:focus,
+.nav-btn:hover:not(:disabled) {
+  background: #e5e5e5;
+  color: #1976d2;
+}
+
+.nav-btn:disabled {
+  color: #aaa;
+  background: none;
   cursor: not-allowed;
-}
-
-.save-btn {
-  margin-left: 0;
-}
-
-.save-btn:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-
-.download-button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.download-button:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
+  opacity: 0.7;
 }
 
 .back-btn {
-  padding: 8px 16px;
-  background-color: #666;
-  color: white;
+  background: #f5f5f5;
+  color: #333;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 14px;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: background 0.2s, color 0.2s;
+  outline: none;
 }
 
-.back-btn:hover {
-  background-color: #555;
+.back-btn:not(:disabled):hover {
+  background: #e0e0e0;
+  color: #1976d2;
 }
 </style> 
