@@ -1046,7 +1046,7 @@ h3 {
 }
 
 .descriptions-scroll {
-  max-height: 300px;
+  max-height: 260px;
   overflow-y: auto;
   margin-bottom: 12px;
   padding-right: 4px;
