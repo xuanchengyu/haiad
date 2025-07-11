@@ -62,6 +62,7 @@
                 :src="video.thumbnail_url || defaultThumbnail" 
                 :alt="video.original_filename"
                 @error="onThumbnailError"
+                class="thumbnail-img"
               />
             </div>
             <div class="video-info">
