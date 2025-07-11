@@ -103,16 +103,13 @@ db = client['haiad']
 # 集合定义
 videos_collection = db['videos']        # 存储视频信息
 scripts_collection = db['scripts']      # 存储脚本信息
-human_scripts_collection = db['human_scripts']  # 人工模式脚本
 users_collection = db['users']  # 使用users集合
 users_collection.create_index('username', unique=True) # 创建用户名索引确保唯一性
-chat_history_collection = db['chat_history']
-scene_chat_history_collection = db['scene_chat_history']
 chat_logging_collection = db['chat_logging']  # 存储LOG日志
 
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
 
 @app.route("/")
 def home():
@@ -1285,6 +1282,15 @@ def generate_scene_description2(current_user):
             #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
             script_array = generate_script_with_instruction(clip_description,selected_keywords,additional_instructions)
             
+            print("切片路径开始===")
+            print("切片路径是：",clip_path)
+            print("切片路径结束===")
+
+
+            print("音频描述开始======")
+            print("音频描述是",clip_description)
+            print("音频描述结束======")
+
             # description = script_array
             print("开始======")
             print("description是",script_array)
@@ -1392,6 +1398,6 @@ def generate_scene_description2(current_user):
 
 
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5002))
-    app.run(host='0.0.0.0', port=port, debug=True)
+# if __name__ == '__main__':
+#     port = int(os.environ.get('PORT', 5002))
+#     app.run(host='0.0.0.0', port=port, debug=True)
