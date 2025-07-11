@@ -140,10 +140,12 @@ def generate_clip_description(clip_path, creativity, num_frames=2, max_retries=1
 
         content = []
         prompt = (
-            "You are an expert in understanding scene transitions based on visual features in a video. "
-            "For the given sequence of images per timestamp, identify the scene in the video. "
-            "Generate audio description for the each scene."
-            "Return the audio description for all scenes in a coherence paragraph and absolutely do not add time ranges and any additionalinformation.\n"
+            "You are an expert in analyzing video scenes. "
+            "Please analyze the provided images and describe what you see in the scene. "
+            "Write a clear, coherent description in English only. "
+            "Focus on the visual elements, actions, and atmosphere. "
+            "Keep your response concise and well-structured. "
+            "Do not include any code formatting, special characters, or non-English text.\n"
         )
 
         content.append({"type": "text", "text": prompt})
@@ -212,8 +214,11 @@ def generate_script_2(clip_descriptions, max_retries=100):
 
         prompt = (
             "You are an expert in writing audio descriptions for videos. "
-            "Please generate audio descriptions in 5 distinct writing styles. "
-
+            "Based on the given content, please generate audio descriptions in 5 distinct writing styles. "
+            "Each description should be a clear, well-structured paragraph in English only. "
+            "Focus on describing what you see in the scene with appropriate detail. "
+            "Do not include any special characters, code formatting, or non-English text.\n\n"
+            
             "The five styles are:\n"
             "1. Concise and Objective – minimal adjectives, factual tone.\n"
             "2. Descriptive and Evocative – uses rich imagery and sensory language.\n"
@@ -221,7 +226,6 @@ def generate_script_2(clip_descriptions, max_retries=100):
             "4. Interpretive or Emotive – reflects mood, emotion, or intention.\n"
             "5. Child-Friendly and Simplified – simple, playful, age-appropriate vocabulary.\n\n"
             
-            "For each style, generate a continuous paragraph describing the scene(s) in the corresponding style. \n"
             "Please return the five audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
             "{description_number (str), description (str)}\n\n"
             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
@@ -326,11 +330,11 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
         # )
 
         prompt = (
-            "You are an expert in writing high-quality audio descriptions for video scenes. "
-            "Based on the following visual content, please generate audio description in 5 different versions.\n\n"
-            "Each version should include coherent, non-overlapping time-based descriptions, where each time segment is described using one concise sentence. "
-            "Do not introduce content not found in the visuals, but you may vary tone, word choice, and phrasing for different versions."
-            "For each versions, generate a continuous paragraph describing the scene(s) in the user-defined writing style and follow additional user-defined requirements. \n\n"
+            "You are an expert in writing clear, coherent audio descriptions for video scenes. "
+            "Based on the given content, please generate 5 different audio descriptions.\n\n"
+            "Each description should be a clear, well-structured paragraph in English only. "
+            "Focus on describing what you see in the scene with appropriate detail. "
+            "Do not include any special characters, code formatting, or non-English text.\n\n"
             "Please return the 5 audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
             "{description_number (str), description (str)}\n\n"
             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
