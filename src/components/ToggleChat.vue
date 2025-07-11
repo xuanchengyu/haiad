@@ -130,12 +130,16 @@
           </div>
         </div> -->
         
-        <div v-else>
+        <div v-else class="descriptions-scroll">
           <div v-for="(desc, index) in descriptions" :key="index" class="desc-item">
             <button 
               @click="selectDescription(desc)" 
               class="desc-btn"
-            >{{ desc }}</button>
+              :class="`style-${index + 1}`"
+            >
+              <span class="style-label">{{ getStyleLabel(index) }}</span>
+              {{ desc }}
+            </button>
           </div>
         </div>
 
@@ -238,7 +242,7 @@
           </div>
         </div> -->
 
-        <div v-else>
+        <div v-else class="descriptions-scroll">
           <div v-for="(desc, index) in descriptions_with_instru" :key="index" class="desc-item">
             <button 
               @click="selectDescription(desc)" 
@@ -345,7 +349,9 @@ export default {
       isLoadingRequest: false, // 请求标签页加载状态
       isLoadingGenerate: false, // 指令标签页加载状态
       activeTab: 'generate',
-      descriptions: '',
+      // descriptions: '',
+      descriptions: [],
+      descriptions_with_instru: [], // 添加缺失的属性
       userMessage: '',
       chatMessages: [],
       keywords: '',
@@ -355,6 +361,7 @@ export default {
         top: '0px',
         left: '0px'},
       selectedKeywords: [], // 存储选中关键词
+      generateKeywords: '', // 添加缺失的属性
       keywordButtons: [
         { label: 'Objective', value: 'Objective' },
         { label: 'Subjective', value: 'Subjective' },
@@ -388,6 +395,10 @@ export default {
         // 新增滑动条更新处理
         updateSlider(event) {
       this.sentenceStyle = parseInt(event.target.value);
+    },
+    getStyleLabel(index) {
+      const labels = ['OBJECTIVE', 'DESCRIPTIVE', 'CONVERSATIONAL', 'INTERPRETIVE', 'PLAIN LANGUAGE'];
+      return labels[index] || `STYLE ${index + 1}`;
     },
     // async loadSceneChatHistory() {
     //   try {
@@ -959,7 +970,6 @@ h3 {
 }
 
 
-
 .loading-indicator {
   display: flex;
   flex-direction: column;
@@ -1033,6 +1043,46 @@ h3 {
   0% { opacity: 0.6; }
   50% { opacity: 1; }
   100% { opacity: 0.6; }
+}
+
+.descriptions-scroll {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  padding-right: 4px;
+}
+
+.style-label {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  background: #e8f4fd;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.style-1 .style-label {
+  background: #e8f5e8;
+  color: #2e7d32;
+}
+.style-2 .style-label {
+  background: #fff3e0;
+  color: #f57c00;
+}
+.style-3 .style-label {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+.style-4 .style-label {
+  background: #e3f2fd;   /* 浅蓝色背景 */
+  color: #1976d2;        /* 蓝色字体 */
+}
+.style-5 .style-label {
+  background: #ffebee;   /* 浅红色背景 */
+  color: #d32f2f;        /* 红色字体 */
 }
 
 </style>
