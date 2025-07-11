@@ -257,41 +257,42 @@ export default {
       }
     },
 
-    async handleAIChat(scene, userMessage) {
-      try {
-        console.log('Handle AI chat:', {
-          scene,
-          userMessage
-        });
+    // async handleAIChat(scene, userMessage) {
+    //   try {
+    //     console.log('Handle AI chat:', {
+    //       scene,
+    //       userMessage
+    //     });
         
-        if (!scene || !scene._id) {
-          throw new Error('Invalid scene data');
-        }
+    //     if (!scene || !scene._id) {
+    //       throw new Error('Invalid scene data');
+    //     }
 
-        const response = await axios.post('/api/ai/scene/chat', {
-          video_id: this.videoId,
-          scene_id: scene._id,
-          current_text: scene.description,
-          user_message: userMessage
-        }, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+    //     const response = await axios.post('/api/ai/scene/chat', {
+    //       video_id: this.videoId,
+    //       scene_id: scene._id,
+    //       current_text: scene.description,
+    //       user_message: userMessage
+    //     }, {
+    //       headers: {
+    //         'Authorization': `Bearer ${localStorage.getItem('token')}`
+    //       }
+    //     });
 
-        if (response.data.success) {
-          return response.data.chat_history;
-        } else {
-          const errorMsg = response.data.error || 'AI processing failed';
-          console.error('AI processing failed:', errorMsg);
-          ElMessage.error(errorMsg);
-        }
-      } catch (error) {
-        console.error('AI chat failed:', error);
-        ElMessage.error(error.message || 'AI chat failed');
-      }
-    }
+    //     if (response.data.success) {
+    //       return response.data.chat_history;
+    //     } else {
+    //       const errorMsg = response.data.error || 'AI processing failed';
+    //       console.error('AI processing failed:', errorMsg);
+    //       ElMessage.error(errorMsg);
+    //     }
+    //   } catch (error) {
+    //     console.error('AI chat failed:', error);
+    //     ElMessage.error(error.message || 'AI chat failed');
+    //   }
+    // }
   },
+  
   watch: {
     scriptData: {
       immediate: true,
