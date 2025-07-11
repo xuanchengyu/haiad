@@ -18,7 +18,7 @@
     >
       <div class="chat-header">
         <div class="nav-header">
-          <h3>How about the description?</h3>
+          <!-- <h3>How about the description?</h3> -->
           <div class="tab-switcher">
             <button 
               @click="activeTab = 'request'"
@@ -30,7 +30,7 @@
               @click="activeTab = 'generate'"
               :class="{ 'active': activeTab === 'generate' }"
             >
-            Giving your instructions
+            Generate with instructions
             </button>
           </div>
         </div>
@@ -40,7 +40,7 @@
     <!-- 1. Request AI description -->
     <div v-if="activeTab === 'request'" class="control-panel">
       <div class="sentence-style-control">
-        <h4 class="slider-title">What linguistic feature do you want?</h4>
+        <h4 class="slider-title">How creative do you want AI to be?</h4>
         <div class="slider-container">
           <input
             type="range"
@@ -52,6 +52,7 @@
           />
           <div class="slider-labels">
             <span class="label">Typical</span>
+            <span class="label">Balanced</span>
             <span class="label">Creative</span>
           </div>
         </div>
@@ -92,8 +93,8 @@
         
         <!-- 底部说明 -->
         <p class="generate-tips">
-          Press “Generate” button, forward linguistic feature,
-          and current clip to AI, and recommend descriptions
+          Click “Generate descriptions” and let AI suggest some descriptions based on your chosen style.
+        
         </p>
 <!-- 
         <div v-for="(desc, index) in descriptions" :key="index" class="desc-item">
@@ -153,7 +154,7 @@
       <!-- 2. Giving your instructions -->
       <div v-if="activeTab === 'generate'" class="control-panel">
       <div class="sentence-style-control">
-        <h4 class="slider-title">What linguistic feature do you want?</h4>
+        <h4 class="slider-title">How creative do you want AI to be?</h4>
         <div class="slider-container">
           <input
             type="range"
@@ -166,6 +167,7 @@
           />
           <div class="slider-labels">
             <span class="label">Typical</span>
+            <span class="label">Balanced</span>
             <span class="label">Creative</span>
           </div>
         </div>
@@ -191,7 +193,7 @@
           <input
             v-model="generateKeywords"
             class="keyword-input"
-            placeholder="Additional styles that need to be included..."
+            placeholder="Add additional requirements..."
           />
         </div>
 
@@ -200,16 +202,14 @@
           <span class="icon-wrapper">
             <span class="material-icons">auto_awesome</span>
           </span>
-          Generate sentences
+          Generate descriptions
         </button>
         
 
 
         <!-- 底部说明文字 -->
         <p class="generate-tips">
-          Press “Generate” button, forward linguistic feature, your requirements
-          and current clip to AI, and recommend descriptions
-
+          Click “Generate descriptions” and let AI suggest some descriptions based on your chosen style and requirements.
         </p>
 
         
@@ -363,9 +363,9 @@ export default {
       selectedKeywords: [], // 存储选中关键词
       generateKeywords: '', // 添加缺失的属性
       keywordButtons: [
-        { label: 'Objective', value: 'Objective' },
-        { label: 'Subjective', value: 'Subjective' },
-        { label: 'Professional', value: 'Professional' },
+        { label: 'Neutral', value: 'Neutral' },
+        { label: 'Interpretive', value: 'Interpretive' },
+        { label: 'Casual', value: 'Casual' },
         { label: 'Concise', value: 'Concise' }]
     }
   },
@@ -761,6 +761,14 @@ export default {
   color: #666;
   font-size: 12px;
   font-weight: 400;
+  flex: 1;
+  text-align: center;
+}
+.slider-labels .label:first-child {
+  text-align: left;
+}
+.slider-labels .label:last-child {
+  text-align: right;
 }
 
 /* 关键词输入样式 */
