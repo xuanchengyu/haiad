@@ -376,26 +376,25 @@ export default {
   width: 100%;
   min-height: 120px;
   padding: 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  resize: vertical;
+  border: none;                /* 去掉边框 */
+  border-radius: 8px;          /* 圆角可保留 */
+  background: #f7f7fa;   /* 一直有淡灰色背景 */
   font-family: inherit;
   line-height: 1.6;
   font-size: 15px;
   color: #1f2937;
-  background: #f9fafb;
-  transition: all 0.2s ease;
+  box-shadow: none;            /* 去掉阴影 */
+  resize: vertical;
+  transition: background 0.2s, box-shadow 0.2s;
+  outline: none;               /* 去掉默认高亮 */
 }
-
-.scene-description:hover {
-  border-color: #d1d5db;
-}
-
 .scene-description:focus {
-  outline: none;
-  border-color: #3b82f6;
-  background: white;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  background: #f7f7fa;   /* 保持一致 */
+  box-shadow: 0 0 0 2px #e3e8f0;
+}
+.scene-description::placeholder {
+  color: #b0b8c9;
+  font-style: italic;
 }
 
 .scene-controls {
