@@ -119,7 +119,7 @@ def generate_clip_description(clip_path, creativity, num_frames=2, max_retries=1
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": content}],
                     temperature=temperature,
-                    max_tokens=1000,
+                    max_tokens=10000,
                 )
                 message = response.choices[0].message.content
                 if message:
