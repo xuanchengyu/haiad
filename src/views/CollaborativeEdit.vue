@@ -3,14 +3,14 @@
   <div class="app-container">
     <header class="header">
       <div class="header-left">
-        <button @click="goBack" class="back-btn">Back</button>
-      </div>
-      <div class="header-buttons">
-        <button @click="generateScript" :disabled="!videoId || isGenerating" :class="['nav-btn', { 'active': isGenerating }]">
-          {{ isGenerating ? 'Loading...' : 'Start Editing' }}
+        <button class="icon-btn" @click="goBack">
+          <el-icon><ArrowLeft /></el-icon>
         </button>
-        <button @click="downloadScript" :disabled="!scenes.length" class="nav-btn">
-          Download
+        <button class="icon-btn" @click="generateScript" :disabled="!videoId || isGenerating">
+          <el-icon><Edit /></el-icon>
+        </button>
+        <button class="icon-btn" @click="downloadScript" :disabled="!scenes.length">
+          <el-icon><Download /></el-icon>
         </button>
       </div>
     </header>
@@ -46,6 +46,7 @@ import VideoPlayer from '@/components/VideoPlayer.vue'
 import ScriptEditor from '@/components/ScriptEditor.vue'
 // import AiAssistant from '@/components/AiAssistant.vue'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft, Edit, Download } from '@element-plus/icons-vue'
 
 export default {
   name: 'CollaborativeEdit',
@@ -53,6 +54,9 @@ export default {
     VideoPlayer,
     ScriptEditor,
     // AiAssistant
+    ArrowLeft,
+    Edit,
+    Download
   },
   data() {
     return {
@@ -279,24 +283,19 @@ async saveAllScenes() {
 }
 
 .header {
-  padding: 10px 20px;
+  padding: 5px 10px;
   background: #fff;
   border-radius: 12px 12px 0 0;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 0 0 6px 0;
-  min-height: 50px;
+  margin: 0 0 2px 0;
+  min-height: 30px;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
-.header-btn {
+/* .header-btn {
   padding: 4px 14px;
   font-size: 14px;
   border: none;
@@ -306,14 +305,14 @@ async saveAllScenes() {
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
   outline: none;
-}
+} */ 
 
-.header-btn.primary {
+/* .header-btn.primary {
   background: #1976d2;
   color: #fff;
-}
+} */
 
-.header-btn:disabled,
+/* .header-btn:disabled,
 .header-btn.primary:disabled {
   background: #b3c6e6;
   color: #fff;
@@ -329,7 +328,7 @@ async saveAllScenes() {
 .header-btn.primary:not(:disabled):hover {
   background: #1565c0;
   color: #fff;
-}
+} */
 
 .main-content {
   flex: 1;
@@ -347,12 +346,12 @@ async saveAllScenes() {
   overflow-y: auto;
 }
 
-.header-buttons {
+/* .header-buttons {
   display: flex;
   gap: 8px;
-}
+} */
 
-.nav-btn {
+/* .nav-btn {
   background: none;
   color: #1976d2;
   border: none;
@@ -376,9 +375,9 @@ async saveAllScenes() {
   background: none;
   cursor: not-allowed;
   opacity: 0.7;
-}
+} */
 
-.back-btn {
+/* .back-btn {
   background: #f5f5f5;
   color: #333;
   border: none;
@@ -393,5 +392,28 @@ async saveAllScenes() {
 .back-btn:not(:disabled):hover {
   background: #e0e0e0;
   color: #1976d2;
+} */
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.icon-btn {
+  padding: 5px;
+  margin-right: 5px;
+  font-size: 14px;
+  color: #666;
+  background: none;
+  border: none;
+  box-shadow: none;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) {
+  color: #1976d2;
+}
+.header-left .el-icon {
+  font-size: 16px;
 }
 </style> 
