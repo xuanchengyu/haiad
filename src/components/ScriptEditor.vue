@@ -53,10 +53,10 @@
         </div>
       <div class="speech-rate">
         <span :class="{
-          'normal-rate': speechRate <= 160, 
-          'high-rate': speechRate > 160
+          'normal-rate': calculateSpeechRate(scene) <= 160, 
+          'high-rate': calculateSpeechRate(scene) > 160
         }">
-          Speech Rate: {{ speechRate }} WPM
+          Speech Rate: {{ calculateSpeechRate(scene) }} WPM
         </span>
       </div>
       </div>
@@ -102,33 +102,24 @@ export default {
   //     scenes: this.scenes
   //   });
   // },
-  computed: {
-  speechRate() {
-    return this.scenes.length > 0 
-      ? this.calculateSpeechRate(this.scenes[0]) 
-      : 0;
-  }
-},
   methods: {
-  calculateSpeechRate(scene) {
-    // 计算时间差（秒）
-    const startSeconds = this.parseTime(scene.start_time);
-    const endSeconds = this.parseTime(scene.end_time);
-    const durationSeconds = endSeconds - startSeconds;
-    
-    if (durationSeconds <= 0) return 0;  // 避免除以0
-    
-    // 计算字数（按空格分割单词）
-    const wordCount = scene.description.trim().split(/\s+/).length;
-    
-    // 计算每分钟字数（WPM）
-    const minutes = durationSeconds / 60;
-    const wpm = Math.round(wordCount / minutes);
-    
-    return isFinite(wpm) ? wpm : 0;  // 处理无效值
-  },
-
-
+    calculateSpeechRate(scene) {
+      // 计算时间差（秒）
+      const startSeconds = this.parseTime(scene.start_time);
+      const endSeconds = this.parseTime(scene.end_time);
+      const durationSeconds = endSeconds - startSeconds;
+      
+      if (durationSeconds <= 0) return 0;  // 避免除以0
+      
+      // 计算字数（按空格分割单词）
+      const wordCount = scene.description.trim().split(/\s+/).length;
+      
+      // 计算每分钟字数（WPM）
+      const minutes = durationSeconds / 60;
+      const wpm = Math.round(wordCount / minutes);
+      
+      return isFinite(wpm) ? wpm : 0;  // 处理无效值
+    },
     parseTime(timeStr) {
       if (!timeStr) return 0;
       const [hours, minutes, seconds] = timeStr.split(':');
@@ -568,4 +559,8 @@ export default {
     font-size: 16px;
   }
 }
+
+
+
+
 </style> 
