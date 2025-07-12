@@ -346,6 +346,7 @@ export default {
   },
   data() {
     return {
+      generationStartTime: 0, // 记录生成开始时间
       isLoadingRequest: false, // 请求标签页加载状态
       isLoadingGenerate: false, // 指令标签页加载状态
       activeTab: 'generate',
@@ -377,8 +378,12 @@ export default {
   },
   methods: {
       selectDescription(description) {
-        // 触发事件并传递描述内容
-        this.$emit('select-description', description, this.sceneId);
+          // 计算生成时间（毫秒）
+        const generationTime = Date.now() - this.generationStartTime;
+
+         // 触发事件并传递描述内容和生成时间
+  this.$emit('select-description', description, this.sceneId, generationTime);
+
       },
     toggleKeyword(keyword) {
     const index = this.selectedKeywords.indexOf(keyword)
@@ -440,6 +445,7 @@ export default {
     // 点击1. "generate description"
       async handleRequest() {
         try {
+          this.generationStartTime = Date.now(); // 记录开始时间
           this.isLoadingRequest = true; // 开始加载
           this.descriptions = []; // 清空之前的结果
 
@@ -471,6 +477,7 @@ export default {
     // 点击2. "generate description"
       async handleGenerate() {
         try {
+          this.generationStartTime = Date.now()
           this.isLoadingGenerate = true; // 开始加载
           this.descriptions_with_instru = []; // 清空之前的结果
 
