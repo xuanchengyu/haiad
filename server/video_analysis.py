@@ -81,8 +81,8 @@ def split_video_segment(video_path, start_time, end_time, output_dir):
             '-t', str(time_duration),
             '-vf', 'fps=25',  # 按原视频帧率设置
             '-c:v', 'libx264',
-            '-preset', 'veryfast',
-            '-crf', '23',
+            '-preset', 'ultrafast',
+            '-crf', '28',
             '-c:a', 'aac',
             '-y',
             clip_path
