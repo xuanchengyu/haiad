@@ -69,30 +69,64 @@ from .video_analysis import generate_clip_description, split_video_segment, gene
 # =====================================
 
 
-# cloudinary
-import cloudinary
-import cloudinary.uploader
-from cloudinary.utils import cloudinary_url
+# Bunny.net 配置
+BUNNY_STORAGE_ZONE = "haiad-videos"
+BUNNY_API_KEY = "c534ac77-9ed3-45fd-bfd39ab774b6-f43c-440e"  # Bunny.net API Key
+BUNNY_STORAGE_URL = f"https://storage.bunnycdn.com/{BUNNY_STORAGE_ZONE}/"
+BUNNY_CDN_URL = "https://haiadvideos.b-cdn.net/"
 
-# cloudinary.config( 
-#     cloud_name = "dcb4mee54",
-#     api_key = "112465673685316",
-#     api_secret = "zklL8gJi-gyc1JgVYDlhDYSg5_M",
-#     secure=True
-# )
+# Bunny.net 上传函数
+def upload_to_bunny(file, storage_path):
+    """上传文件到 Bunny.net Storage Zone"""
+    try:
+        headers = {
+            'AccessKey': BUNNY_API_KEY,
+            'Content-Type': 'application/octet-stream'
+        }
+        
+        # 读取文件内容
+        file.seek(0)
+        file_content = file.read()
+        
+        # 上传到 Bunny.net
+        upload_url = f"{BUNNY_STORAGE_URL}{storage_path}"
+        response = requests.put(upload_url, data=file_content, headers=headers)
+        
+        if response.status_code == 201:
+            # 返回 CDN URL
+            cdn_url = f"{BUNNY_CDN_URL}{storage_path}"
+            return {
+                'success': True,
+                'cdn_url': cdn_url,
+                'storage_path': storage_path
+            }
+        else:
+            print(f"Bunny.net 上传失败: {response.status_code} - {response.text}")
+            return {'success': False, 'error': response.text}
+            
+    except Exception as e:
+        print(f"Bunny.net 上传错误: {str(e)}")
+        return {'success': False, 'error': str(e)}
 
-# yangruixia  cloudinary
-cloudinary.config( 
-    cloud_name = "dt0e1nlqj",  # 替换为新账号的 cloud_name
-    api_key = "617634364954444",  # 替换为新账号的 api_key
-    api_secret = "wL-TOfaYyP8vr_ezcOqZQ9QVUOE",  # 替换为新账号的 api_secret
-    secure=True
-)
-
-# 新的cloudinary账号
-# yrx_haiad
-# 617634364954444
-# wL-TOfaYyP8vr_ezcOqZQ9QVUOE
+def delete_from_bunny(storage_path):
+    """从 Bunny.net 删除文件"""
+    try:
+        headers = {
+            'AccessKey': BUNNY_API_KEY
+        }
+        
+        delete_url = f"{BUNNY_STORAGE_URL}{storage_path}"
+        response = requests.delete(delete_url, headers=headers)
+        
+        if response.status_code == 200:
+            return True
+        else:
+            print(f"Bunny.net 删除失败: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"Bunny.net 删除错误: {str(e)}")
+        return False
 
 # MongoDB atlas
 uri = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority&appName=haiad"
@@ -176,10 +210,10 @@ def generate_thumbnail(current_user, file, video_id):
     try:
         # 从数据库获取视频信息
         video = videos_collection.find_one({'_id': ObjectId(video_id)})
-        if not video or 'cloudinary_url' not in video:
+        if not video or 'bunny_url' not in video:
             raise Exception('Video URL not found')
 
-        video_url = video['cloudinary_url']
+        video_url = video['bunny_url']
         
         # 创建临时目录
         temp_dir = tempfile.mkdtemp()
@@ -221,16 +255,27 @@ def generate_thumbnail(current_user, file, video_id):
             image.save(img_byte_arr, format='JPEG')
             img_byte_arr.seek(0)
 
-            # 上传到 Cloudinary
-            upload_result = cloudinary.uploader.upload(
-                img_byte_arr,
-                folder=f"users/{str(current_user['_id'])}/thumbnails",
-                public_id=f"thumb_{video_id}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}",
-                resource_type="image"
-            )
-
-            cap.release()
-            return upload_result['secure_url']
+            # 上传缩略图到 Bunny.net
+            timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
+            thumbnail_path = f"users/{str(current_user['_id'])}/thumbnails/thumb_{video_id}_{timestamp}.jpg"
+            
+            # 创建缩略图上传请求
+            headers = {
+                'AccessKey': BUNNY_API_KEY,
+                'Content-Type': 'image/jpeg'
+            }
+            
+            upload_url = f"{BUNNY_STORAGE_URL}{thumbnail_path}"
+            response = requests.put(upload_url, data=img_byte_arr.getvalue(), headers=headers)
+            
+            if response.status_code == 201:
+                thumbnail_url = f"{BUNNY_CDN_URL}{thumbnail_path}"
+                cap.release()
+                return thumbnail_url
+            else:
+                print(f"缩略图上传失败: {response.status_code} - {response.text}")
+                cap.release()
+                return None
 
         finally:
             # 清理临时文件和目录
@@ -273,24 +318,17 @@ def upload_video(current_user):
             print(f"开始上传文件: {filename}")  # 添加日志
             
             try:
-                # 上传到 Cloudinary
-                upload_result = cloudinary.uploader.upload(
-                    file,
-                    resource_type="video",
-                    folder=f"users/{str(current_user['_id'])}/videos",
-                    public_id=f"{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{filename.rsplit('.', 1)[0]}",  # 移除扩展名
-                    overwrite=True,
-                    chunk_size=6000000,
-                    eager=[
-                        {"streaming_profile": "full_hd", "format": "m3u8"}
-                    ],
-                    eager_async=True
-                )
+                # 生成存储路径
+                timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
+                storage_path = f"users/{str(current_user['_id'])}/videos/{timestamp}_{filename}"
+                
+                # 上传到 Bunny.net
+                upload_result = upload_to_bunny(file, storage_path)
 
-                print(f"Cloudinary 上传结果: {upload_result}")
+                print(f"Bunny.net 上传结果: {upload_result}")
 
-                if not upload_result or 'secure_url' not in upload_result:
-                    raise Exception('Failed to upload to Cloudinary')
+                if not upload_result or not upload_result.get('success'):
+                    raise Exception(f'Failed to upload to Bunny.net: {upload_result.get("error", "Unknown error")}')
 
                 # 创建视频记录
                 video_id = videos_collection.insert_one({
@@ -299,9 +337,8 @@ def upload_video(current_user):
                     'original_filename': file.filename,
                     'created_at': datetime.now(UTC),
                     'has_script': False,
-                    'cloudinary_public_id': upload_result['public_id'],
-                    'cloudinary_url': upload_result['secure_url'],
-                    'cloudinary_resource_type': 'video'
+                    'bunny_storage_path': upload_result['storage_path'],
+                    'bunny_url': upload_result['cdn_url']
                 }).inserted_id
 
                 # 生成缩略图
@@ -316,7 +353,7 @@ def upload_video(current_user):
                 return jsonify({
                     'success': True,
                     'video_id': str(video_id),
-                    'video_url': upload_result['secure_url'],
+                    'video_url': upload_result['cdn_url'],
                     'thumbnail_url': thumbnail_url or ''
                 })
 
@@ -344,14 +381,13 @@ def get_video(current_user, video_id):
         if not video:
             return jsonify({'error': '视频不存在或无权访问'}), 404
 
-        if 'cloudinary_url' not in video:
+        if 'bunny_url' not in video:
             return jsonify({'error': '视频文件不存在'}), 404
             
-        # 返回视频的 Cloudinary URL
+        # 返回视频的 Bunny.net URL
         return jsonify({
             'success': True,
-            'video_url': video.get('cloudinary_url'),  # 这里应该是 playback_url
-            'original_url': video.get('secure_url', ''),  # 保存原始视频 URL
+            'video_url': video.get('bunny_url'),
             'thumbnail_url': video.get('thumbnail_url', ''),
             'filename': video.get('original_filename', '')
         })
@@ -376,34 +412,25 @@ def delete_video(current_user, video_id):
         if not video:
             return jsonify({'success': False, 'error': '视频不存在或无权访问'}), 404
             
-        # 从 Cloudinary 删除视频
-        if 'cloudinary_public_id' in video:
+        # 从 Bunny.net 删除视频
+        if 'bunny_storage_path' in video:
             try:
-                result = cloudinary.uploader.destroy(
-                    video['cloudinary_public_id'],
-                    resource_type=video.get('cloudinary_resource_type', 'video'),
-                    invalidate=True
-                )            
+                result = delete_from_bunny(video['bunny_storage_path'])
                 print(f"视频删除结果: {result}")
             except Exception as e:
                 print(f"删除视频文件失败: {str(e)}")
             
-        # 从 Cloudinary 删除缩略图
+        # 从 Bunny.net 删除缩略图
         if 'thumbnail_url' in video:
             try:
-                # 从 URL 提取 public_id
+                # 从 CDN URL 提取存储路径
                 thumbnail_url = video['thumbnail_url']
-                # 从 URL 中提取完整的 public_id，包括文件夹路径
-                # 例如: users/67b3b1145368156d24c24292/thumbnails/thumb_xxx
-                path_parts = thumbnail_url.split('/upload/')[1].split('.')
-                public_id = path_parts[0]
-                print(f"正在删除缩略图，public_id: {public_id}")
+                # 从 CDN URL 中提取存储路径
+                # 例如: https://haiadvideos.b-cdn.net/users/xxx/thumbnails/thumb_xxx.jpg
+                storage_path = thumbnail_url.replace(BUNNY_CDN_URL, '')
+                print(f"正在删除缩略图，storage_path: {storage_path}")
                 
-                result = cloudinary.uploader.destroy(
-                    public_id,
-                    resource_type='image',
-                    invalidate=True
-                )
+                result = delete_from_bunny(storage_path)
                 print(f"缩略图删除结果: {result}")
             except Exception as e:
                 print(f"删除缩略图失败: {str(e)}")
@@ -460,7 +487,7 @@ def get_videos(current_user):
             'status': video.get('status', 'ready'),
             'has_script': video.get('has_script', False),
             'created_at': video['created_at'].isoformat(),
-            'video_url': video.get('cloudinary_url', ''),
+            'video_url': video.get('bunny_url', ''),
             'thumbnail_url': video.get('thumbnail_url', '')
         } for video in videos]
         
@@ -1045,20 +1072,20 @@ def generate_scene_description(current_user):
         if not video:
             return jsonify({'error': 'Video not found or access denied'}), 404
 
-        # 检查 Cloudinary URL
-        if 'cloudinary_url' not in video:
+        # 检查 Bunny.net URL
+        if 'bunny_url' not in video:
             return jsonify({'error': 'Video URL not found'}), 404
             
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
         os.makedirs(user_temp_dir, exist_ok=True)
 
-        # 从 Cloudinary 下载视频到临时文件
+        # 从 Bunny.net 下载视频到临时文件
         temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
         
         try:
             # 使用 requests 下载视频
-            response = requests.get(video['cloudinary_url'], stream=True)
+            response = requests.get(video['bunny_url'], stream=True)
             response.raise_for_status()  # 确保请求成功
             
             with open(temp_video_path, 'wb') as temp_file:
@@ -1245,20 +1272,20 @@ def generate_scene_description2(current_user):
         if not video:
             return jsonify({'error': 'Video not found or access denied'}), 404
 
-        # 检查 Cloudinary URL
-        if 'cloudinary_url' not in video:
+        # 检查 Bunny.net URL
+        if 'bunny_url' not in video:
             return jsonify({'error': 'Video URL not found'}), 404
             
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
         os.makedirs(user_temp_dir, exist_ok=True)
 
-        # 从 Cloudinary 下载视频到临时文件
+        # 从 Bunny.net 下载视频到临时文件
         temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
         
         try:
             # 使用 requests 下载视频
-            response = requests.get(video['cloudinary_url'], stream=True)
+            response = requests.get(video['bunny_url'], stream=True)
             response.raise_for_status()  # 确保请求成功
             
             with open(temp_video_path, 'wb') as temp_file:
