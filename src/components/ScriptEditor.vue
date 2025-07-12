@@ -50,15 +50,19 @@
             class="scene-description"
             :placeholder="'Edit your script here...'"
           ></textarea>
+          <div class="wpm-bottom">
+            <span 
+              class="wpm-icon-label"
+              :class="{
+                'normal-rate': calculateSpeechRate(scene) <= 160, 
+                'high-rate': calculateSpeechRate(scene) > 160
+              }"
+            >
+              <span class="material-icons wpm-icon">speed</span>
+              {{ calculateSpeechRate(scene) }} wpm
+            </span>
+          </div>
         </div>
-      <div class="speech-rate">
-        <span :class="{
-          'normal-rate': calculateSpeechRate(scene) <= 160, 
-          'high-rate': calculateSpeechRate(scene) > 160
-        }">
-          Speech Rate: {{ calculateSpeechRate(scene) }} WPM
-        </span>
-      </div>
       </div>
     </div>
   </div>
@@ -127,7 +131,7 @@ export default {
       return parseInt(hours || 0) * 3600 + parseInt(minutes || 0) * 60 + parseInt(secs || 0) + parseInt(ms || 0) / 1000;
     },
 
-    handleDescriptionSelect(description, sceneId, generationTime) {
+    handleDescriptionSelect(description, sceneId) {
       const scene = this.scenes.find(s => s._id === sceneId);
       if (scene) {
         // 追加描述
@@ -137,18 +141,18 @@ export default {
           scene.description = description;
         }
         
-        // 计算语速（WPM）
-        const wordCount = description.trim().split(/\s+/).length;
-        const minutes = generationTime / (1000 * 60); // 毫秒转分钟
-        const wpm = Math.round(wordCount / minutes);
+        // // 计算语速（WPM）
+        // const wordCount = description.trim().split(/\s+/).length;
+        // const minutes = generationTime / (1000 * 60); // 毫秒转分钟
+        // const wpm = Math.round(wordCount / minutes);
         
-        // 更新场景的语速信息（如果需要保存）
-        // 这里可以添加逻辑将wpm保存到场景对象中
+        // // 更新场景的语速信息（如果需要保存）
+        // // 这里可以添加逻辑将wpm保存到场景对象中
         
-        ElMessage.success('Successfully added description!');
+        // ElMessage.success('Successfully added description!');
         
-        // 强制更新视图以显示新计算的语速
-        this.$forceUpdate();
+        // // 强制更新视图以显示新计算的语速
+        // this.$forceUpdate();
       }
     },
     async addScene(sceneId, position) {
@@ -226,7 +230,7 @@ export default {
         );
         
         if (response.data.success) {
-          ElMessage.success('Update success');
+          ElMessage.success('successfully saved');
           this.$emit('update:script', this.scenes);
         } else {
           throw new Error(response.data.error || 'Update failed');
@@ -335,22 +339,33 @@ export default {
 </script>
 
 <style scoped>
-.speech-rate {
-  margin-top: 8px;
+.wpm-bottom {
+  text-align: right;
+  margin-top: 4px;
+  min-height: 18px;
+}
+.wpm-icon-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #10b981;
+  gap: 3px;
+  background: none;
+  border-radius: 8px;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+.wpm-icon {
   font-size: 14px;
-  padding: 4px 8px;
-  background: #f3f4f6;
-  border-radius: 4px;
-  display: inline-block;
+  vertical-align: middle;
+  margin-right: 2px;
 }
-
-.normal-rate {
-  color: #10b981; /* 绿色 */
+.wpm-icon-label.normal-rate {
+  color: #10b981;
 }
-
-.high-rate {
-  color: #ef4444; /* 红色 */
-  font-weight: bold;
+.wpm-icon-label.high-rate {
+  color: #ef4444;
 }
 
 
@@ -492,16 +507,6 @@ export default {
 
 .material-icons {
   font-size: 20px;
-}
-
-.speech-rate {
-  margin-top: 8px;
-  color: #6b7280;
-  font-size: 14px;
-  padding: 4px 8px;
-  background: #f3f4f6;
-  border-radius: 4px;
-  display: inline-block;
 }
 
 /* 占位符文本样式 */
