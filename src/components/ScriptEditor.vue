@@ -127,26 +127,30 @@ export default {
       return parseInt(hours || 0) * 3600 + parseInt(minutes || 0) * 60 + parseInt(secs || 0) + parseInt(ms || 0) / 1000;
     },
 
-    handleDescriptionSelect(description, sceneId) {
-  // 找到对应的场景
-  const scene = this.scenes.find(s => s._id === sceneId);
-  if (scene) {
-    // 追加描述到现有内容（保留原有内容并在后面添加新内容）
-    if (scene.description) {
-      // 如果已有内容，先添加一个换行再追加新内容
-      scene.description += '\n' + description;
-    } else {
-      // 如果原本没有内容，直接赋值
-      scene.description = description;
-    }
-    
-    // 自动保存更新
-    // this.updateScene(scene);
-    
-    // 可选：显示成功消息
-    ElMessage.success('Successfully added description!');
-  }
-},
+    handleDescriptionSelect(description, sceneId, generationTime) {
+      const scene = this.scenes.find(s => s._id === sceneId);
+      if (scene) {
+        // 追加描述
+        if (scene.description) {
+          scene.description += '\n' + description;
+        } else {
+          scene.description = description;
+        }
+        
+        // 计算语速（WPM）
+        const wordCount = description.trim().split(/\s+/).length;
+        const minutes = generationTime / (1000 * 60); // 毫秒转分钟
+        const wpm = Math.round(wordCount / minutes);
+        
+        // 更新场景的语速信息（如果需要保存）
+        // 这里可以添加逻辑将wpm保存到场景对象中
+        
+        ElMessage.success('Successfully added description!');
+        
+        // 强制更新视图以显示新计算的语速
+        this.$forceUpdate();
+      }
+    },
     async addScene(sceneId, position) {
       try {
         const token = localStorage.getItem('token');
