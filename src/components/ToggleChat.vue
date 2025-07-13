@@ -93,7 +93,7 @@
         
         <!-- 底部说明 -->
         <p class="generate-tips">
-          Click “Generate descriptions” and let AI suggest some descriptions based on your chosen style.
+          Click “Generate descriptions” and let AI suggest some descriptions for current time range based on your chosen style.
         
         </p>
 <!-- 
@@ -209,7 +209,7 @@
 
         <!-- 底部说明文字 -->
         <p class="generate-tips">
-          Click “Generate descriptions” and let AI suggest some descriptions based on your chosen style and requirements.
+          Click “Generate descriptions” and let AI suggest some descriptions for current time range based on your instructions.
         </p>
 
         
@@ -307,7 +307,6 @@
 
 <script>
 import axios from '@/main'
-import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/store'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
@@ -402,7 +401,7 @@ export default {
       this.sentenceStyle = parseInt(event.target.value);
     },
     getStyleLabel(index) {
-      const labels = ['OBJECTIVE', 'DESCRIPTIVE', 'CONVERSATIONAL', 'INTERPRETIVE', 'PLAIN LANGUAGE'];
+      const labels = ['OBJECTIVE', 'DESCRIPTIVE', 'PLAIN LANGUAGE'];
       return labels[index] || `STYLE ${index + 1}`;
     },
     // async loadSceneChatHistory() {
@@ -506,79 +505,79 @@ export default {
         }finally {
     this.isLoadingGenerate = false; // 结束加载
   }
-      },
+},
 
 
-    async sendMessage() {
-      if ((!this.userMessage.trim() && !this.keywords.trim()) || this.isLoading) return;
+  //   async sendMessage() {
+  //     if ((!this.userMessage.trim() && !this.keywords.trim()) || this.isLoading) return;
       
-      try {
-        this.isLoading = true;
+  //     try {
+  //       this.isLoading = true;
         
-        // 验证必要参数
-        const params = {
-          video_id: this.videoId,
-          scene_id: this.sceneId,
-          current_text: this.currentText,
-          user_message: this.userMessage,
-          keywords: this.keywords, // 添加关键词参数
-          style_level: this.sentenceStyle // 添加风格参数
-        };
+  //       // 验证必要参数
+  //       const params = {
+  //         video_id: this.videoId,
+  //         scene_id: this.sceneId,
+  //         current_text: this.currentText,
+  //         user_message: this.userMessage,
+  //         keywords: this.keywords, // 添加关键词参数
+  //         style_level: this.sentenceStyle // 添加风格参数
+  //       };
         
-        console.log('Checking parameters:', params);
+  //       console.log('Checking parameters:', params);
         
-        const missingParams = Object.entries(params)
-          .filter(([, value]) => !value)
-          .map(([key]) => key);
+  //       const missingParams = Object.entries(params)
+  //         .filter(([, value]) => !value)
+  //         .map(([key]) => key);
         
-        if (missingParams.length > 0) {
-          console.error('Missing parameters:', missingParams);
-          throw new Error(`Missing required parameters: ${missingParams.join(', ')}`);
-        }
+  //       if (missingParams.length > 0) {
+  //         console.error('Missing parameters:', missingParams);
+  //         throw new Error(`Missing required parameters: ${missingParams.join(', ')}`);
+  //       }
         
-        // 添加用户消息到聊天历史
-        this.chatMessages.push({
-          role: 'user',
-          content: this.userMessage,
-          timestamp: new Date()
-        });
+  //       // 添加用户消息到聊天历史
+  //       this.chatMessages.push({
+  //         role: 'user',
+  //         content: this.userMessage,
+  //         timestamp: new Date()
+  //       });
         
-        console.log('Sending request with params:', params);  // 添加日志
+  //       console.log('Sending request with params:', params);  // 添加日志
         
-        const response = await axios.post('/api/ai/scene/chat', params);
+  //       const response = await axios.post('/api/ai/scene/chat', params);
         
-        console.log('Received response:', response.data);
+  //       console.log('Received response:', response.data);
         
-        if (response.data.success) {
-          // 添加 AI 响应到聊天历史
-          this.chatMessages.push({
-            role: 'assistant',
-            content: response.data.message,
-            timestamp: new Date()
-          });
+  //       if (response.data.success) {
+  //         // 添加 AI 响应到聊天历史
+  //         this.chatMessages.push({
+  //           role: 'assistant',
+  //           content: response.data.message,
+  //           timestamp: new Date()
+  //         });
           
-          // 滚动到最新消息
-          this.$nextTick(() => {
-            if (this.$refs.chatHistory) {
-              this.$refs.chatHistory.scrollTop = this.$refs.chatHistory.scrollHeight;
-            }
-          });
-        } else {
-          throw new Error(response.data.error || 'Request failed');
-        }
+  //         // 滚动到最新消息
+  //         this.$nextTick(() => {
+  //           if (this.$refs.chatHistory) {
+  //             this.$refs.chatHistory.scrollTop = this.$refs.chatHistory.scrollHeight;
+  //           }
+  //         });
+  //       } else {
+  //         throw new Error(response.data.error || 'Request failed');
+  //       }
         
-      } catch (error) {
-        console.error('Send message failed:', error);
-        ElMessage.error(error.message || 'Send message failed');
-        this.chatMessages.push({
-          role: 'system',
-          content: 'Send message failed, please try again.',
-          timestamp: new Date()
-        });
-      } finally {
-        this.isLoading = false;
-      }
-    }
+  //     } catch (error) {
+  //       console.error('Send message failed:', error);
+  //       ElMessage.error(error.message || 'Send message failed');
+  //       this.chatMessages.push({
+  //         role: 'system',
+  //         content: 'Send message failed, please try again.',
+  //         timestamp: new Date()
+  //       });
+  //     } finally {
+  //       this.isLoading = false;
+  //     }
+  //   }
   }
 }
 </script>
@@ -1061,7 +1060,7 @@ h3 {
 }
 
 .descriptions-scroll {
-  max-height: 260px;
+  max-height: 280px;
   overflow-y: auto;
   margin-bottom: 12px;
   padding-right: 4px;
@@ -1091,14 +1090,14 @@ h3 {
   background: #f3e5f5;
   color: #7b1fa2;
 }
-.style-4 .style-label {
-  background: #e3f2fd;   /* 浅蓝色背景 */
-  color: #1976d2;        /* 蓝色字体 */
-}
-.style-5 .style-label {
-  background: #ffebee;   /* 浅红色背景 */
-  color: #d32f2f;        /* 红色字体 */
-}
+/* .style-4 .style-label {
+  background: #e3f2fd;   
+  color: #1976d2;        
+} */
+/* .style-5 .style-label {
+  background: #ffebee;  
+  color: #d32f2f;       
+} */
 
 </style>
 

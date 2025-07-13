@@ -30,6 +30,7 @@
           mode="collaborative"
           @update:script="updateScript"
           @seek="handleSeek"
+          @play-segment="handlePlaySegment"
         />
       </div>
 
@@ -269,6 +270,11 @@ async saveAllScenes() {
     handleSeek(timeStr) {
       if (this.$refs.videoPlayer) {
         this.$refs.videoPlayer.seekTo(timeStr);
+      }
+    },
+    handlePlaySegment(start, end) {
+      if (this.$refs.videoPlayer && this.$refs.videoPlayer.playSegment) {
+        this.$refs.videoPlayer.playSegment(start, end);
       }
     },
   }

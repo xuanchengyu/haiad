@@ -7,31 +7,98 @@
         <div class="scene-header">
           <div class="time-range">
             <!-- 通过 v-model 双向绑定到 scene 对象的 start_time 和 end_time 属性 -->
-            <input 
-              type="text" 
-              v-model="scene.start_time"
-              class="time-input"
-              @click="$emit('seek', scene.start_time)"
-            />
-            <span class="time-separator">-</span>
-            <input 
-              type="text" 
-              v-model="scene.end_time"
-              class="time-input"
-              @click="$emit('seek', scene.end_time)"
-            />
+            <div class="time-group">
+              <input
+                class="time-part"
+                maxlength="2"
+                v-model="scene.start_h"
+                @input="onTimeInput($event, scene, 'start', 0)"
+                @keydown="onTimeKeydown($event, scene, 'start', 0)"
+                @paste="onTimePaste($event, scene, 'start')"
+                :ref="'start_h_' + scene._id"
+              />
+              <span class="timecode-separator">:</span>
+              <input
+                class="time-part"
+                maxlength="2"
+                v-model="scene.start_m"
+                @input="onTimeInput($event, scene, 'start', 1)"
+                @keydown="onTimeKeydown($event, scene, 'start', 1)"
+                :ref="'start_m_' + scene._id"
+              />
+              <span class="timecode-separator">:</span>
+              <input
+                class="time-part"
+                maxlength="2"
+                v-model="scene.start_s"
+                @input="onTimeInput($event, scene, 'start', 2)"
+                @keydown="onTimeKeydown($event, scene, 'start', 2)"
+                :ref="'start_s_' + scene._id"
+              />
+              <span class="timecode-separator">.</span>
+              <input
+                class="time-part ms"
+                maxlength="3"
+                v-model="scene.start_ms"
+                @input="onTimeInput($event, scene, 'start', 3)"
+                @keydown="onTimeKeydown($event, scene, 'start', 3)"
+                :ref="'start_ms_' + scene._id"
+              />
+            </div>
+            <span class="time-range-separator">-</span>
+            <div class="time-group">
+              <input
+                class="time-part"
+                maxlength="2"
+                v-model="scene.end_h"
+                @input="onTimeInput($event, scene, 'end', 0)"
+                @keydown="onTimeKeydown($event, scene, 'end', 0)"
+                @paste="onTimePaste($event, scene, 'end')"
+                :ref="'end_h_' + scene._id"
+              />
+              <span class="timecode-separator">:</span>
+              <input
+                class="time-part"
+                maxlength="2"
+                v-model="scene.end_m"
+                @input="onTimeInput($event, scene, 'end', 1)"
+                @keydown="onTimeKeydown($event, scene, 'end', 1)"
+                :ref="'end_m_' + scene._id"
+              />
+              <span class="timecode-separator">:</span>
+              <input
+                class="time-part"
+                maxlength="2"
+                v-model="scene.end_s"
+                @input="onTimeInput($event, scene, 'end', 2)"
+                @keydown="onTimeKeydown($event, scene, 'end', 2)"
+                :ref="'end_s_' + scene._id"
+              />
+              <span class="timecode-separator">.</span>
+              <input
+                class="time-part ms"
+                maxlength="3"
+                v-model="scene.end_ms"
+                @input="onTimeInput($event, scene, 'end', 3)"
+                @keydown="onTimeKeydown($event, scene, 'end', 3)"
+                :ref="'end_ms_' + scene._id"
+              />
+            </div>
+            <button class="play-btn" @click="handlePlaySegment(scene)" title="play">
+              <span class="material-icons">play_arrow</span>
+            </button>
           </div>
           <div class="scene-controls">
-            <button @click="deleteScene(scene._id)" class="control-btn" title="Delete Scene">
+            <button @click="deleteScene(scene._id)" class="control-btn" title="Delete">
               <span class="material-icons">delete</span>
             </button>
-            <button @click="updateScene(scene)" class="control-btn" title="Save Scene">
+            <button @click="updateScene(scene)" class="control-btn" title="Save">
               <span class="material-icons">save</span>
             </button>
-            <button @click="addScene(scene._id, 'before')" class="control-btn" title="Add Scene Above">
+            <button @click="addScene(scene._id, 'before')" class="control-btn" title="Insert above">
               <span class="material-icons">arrow_upward</span>
             </button>
-            <button @click="addScene(scene._id, 'after')" class="control-btn" title="Add Scene Below">
+            <button @click="addScene(scene._id, 'after')" class="control-btn" title="Insert below">
               <span class="material-icons">arrow_downward</span>
             </button>
             <ToggleChat 
@@ -97,7 +164,8 @@ export default {
     return {
       scenes: [],
       loading: false,
-      error: null
+      error: null,
+      timeAllSelected: false // 标记是否全选
     }
   },
   // mounted() {
@@ -132,20 +200,20 @@ export default {
     },
 
     handleDescriptionSelect(description, sceneId) {
-      const scene = this.scenes.find(s => s._id === sceneId);
-      if (scene) {
+  const scene = this.scenes.find(s => s._id === sceneId);
+  if (scene) {
         // 追加描述
-        if (scene.description) {
-          scene.description += '\n' + description;
-        } else {
-          scene.description = description;
-        }
-        
+    if (scene.description) {
+      scene.description += '\n' + description;
+    } else {
+      scene.description = description;
+    }
+    
         // // 计算语速（WPM）
         // const wordCount = description.trim().split(/\s+/).length;
         // const minutes = generationTime / (1000 * 60); // 毫秒转分钟
         // const wpm = Math.round(wordCount / minutes);
-        
+    
         // // 更新场景的语速信息（如果需要保存）
         // // 这里可以添加逻辑将wpm保存到场景对象中
         
@@ -153,8 +221,8 @@ export default {
         
         // // 强制更新视图以显示新计算的语速
         // this.$forceUpdate();
-      }
-    },
+  }
+},
     async addScene(sceneId, position) {
       try {
         const token = localStorage.getItem('token');
@@ -165,10 +233,11 @@ export default {
 
         const newScene = {
           scene_number: `${this.scenes.length + 1}`,
-          start_time: '00:00:00.000',
-          end_time: '00:00:00.000',
+          start_h: '00', start_m: '00', start_s: '00', start_ms: '000',
+          end_h: '00', end_m: '00', end_s: '00', end_ms: '000',
           description: ''
         };
+        this.mergeTimeFields(newScene);
         
         const referenceIndex = this.scenes.findIndex(s => s._id === sceneId);
         const insertIndex = position === 'before' ? referenceIndex : referenceIndex + 1;
@@ -190,7 +259,7 @@ export default {
         
         if (response.data.success) {
           this.scenes.splice(insertIndex, 0, response.data.scene);
-          ElMessage.success('Add success');
+          ElMessage.success('Insert success');
           this.$emit('update:script', this.scenes);
         } else {
           throw new Error(response.data.error || 'Add failed');
@@ -206,6 +275,7 @@ export default {
     },
 
     async updateScene(scene) {
+      this.mergeTimeFields(scene);
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -230,7 +300,7 @@ export default {
         );
         
         if (response.data.success) {
-          ElMessage.success('successfully saved');
+          ElMessage.success('Update success');
           this.$emit('update:script', this.scenes);
         } else {
           throw new Error(response.data.error || 'Update failed');
@@ -320,6 +390,95 @@ export default {
     //     ElMessage.error(error.message || 'AI chat failed');
     //   }
     // }
+    onTimeInput(e, scene, type, idx) {
+      const fields = [`${type}_h`, `${type}_m`, `${type}_s`, `${type}_ms`];
+      let val = e.target.value.replace(/\D/g, '');
+      if (idx < 3) val = val.slice(0, 2);
+      else val = val.slice(0, 3);
+      scene[fields[idx]] = val;
+
+      // 单框智能输入
+      if (idx === 0 && val.length > 2) {
+        let full = val.padStart(7, '0');
+        scene[fields[0]] = full.slice(0, 2);
+        scene[fields[1]] = full.slice(2, 4);
+        scene[fields[2]] = full.slice(4, 6);
+        scene[fields[3]] = full.slice(6, 9);
+        const refEl = this.$refs[fields[3] + '_' + scene._id];
+        if (Array.isArray(refEl)) {
+          refEl[0] && refEl[0].focus && refEl[0].focus();
+        } else if (refEl && refEl.focus) {
+          refEl.focus();
+        }
+        return;
+      }
+
+      // 自动跳转
+      if ((idx < 3 && val.length === 2) || (idx === 3 && val.length === 3)) {
+        if (idx < 3) {
+          const refEl = this.$refs[fields[idx + 1] + '_' + scene._id];
+          if (Array.isArray(refEl)) {
+            refEl[0] && refEl[0].focus && refEl[0].focus();
+          } else if (refEl && refEl.focus) {
+            refEl.focus();
+          }
+        }
+      }
+    },
+    onTimeKeydown(e, scene, type, idx) {
+      const fields = [`${type}_h`, `${type}_m`, `${type}_s`, `${type}_ms`];
+      if (e.key === 'Backspace' && !scene[fields[idx]] && idx > 0) {
+        const refEl = this.$refs[fields[idx - 1] + '_' + scene._id];
+        if (Array.isArray(refEl)) {
+          refEl[0] && refEl[0].focus && refEl[0].focus();
+        } else if (refEl && refEl.focus) {
+          refEl.focus();
+        }
+      }
+      if (e.key === 'ArrowLeft' && idx > 0) {
+        const refEl = this.$refs[fields[idx - 1] + '_' + scene._id];
+        if (Array.isArray(refEl)) {
+          refEl[0] && refEl[0].focus && refEl[0].focus();
+        } else if (refEl && refEl.focus) {
+          refEl.focus();
+        }
+        e.preventDefault();
+      }
+      if (e.key === 'ArrowRight' && idx < 3) {
+        const refEl = this.$refs[fields[idx + 1] + '_' + scene._id];
+        if (Array.isArray(refEl)) {
+          refEl[0] && refEl[0].focus && refEl[0].focus();
+        } else if (refEl && refEl.focus) {
+          refEl.focus();
+        }
+        e.preventDefault();
+      }
+    },
+    onTimePaste(e, scene, type) {
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      const match = text.match(/^(\d{2}):(\d{2}):(\d{2})[.,](\d{1,3})$/);
+      if (match) {
+        e.preventDefault();
+        scene[`${type}_h`] = match[1];
+        scene[`${type}_m`] = match[2];
+        scene[`${type}_s`] = match[3];
+        scene[`${type}_ms`] = match[4].padEnd(3, '0');
+        const refEl = this.$refs[`${type}_ms_${scene._id}`];
+        if (Array.isArray(refEl)) {
+          refEl[0] && refEl[0].focus && refEl[0].focus();
+        } else if (refEl && refEl.focus) {
+          refEl.focus();
+        }
+      }
+    },
+    mergeTimeFields(scene) {
+      scene.start_time = `${scene.start_h}:${scene.start_m}:${scene.start_s}.${scene.start_ms}`;
+      scene.end_time = `${scene.end_h}:${scene.end_m}:${scene.end_s}.${scene.end_ms}`;
+    },
+    handlePlaySegment(scene) {
+      this.mergeTimeFields(scene);
+      this.$emit('play-segment', scene.start_time, scene.end_time);
+    },
   },
   
   watch: {
@@ -327,10 +486,26 @@ export default {
       immediate: true,
       handler(newValue) {
         if (Array.isArray(newValue)) {
-          this.scenes = newValue.map(scene => ({
-            ...scene,
-            _id: scene._id || ''
-          }));
+          this.scenes = newValue.map(scene => {
+            // 拆分 start_time
+            let [sh, sm, ssms] = (scene.start_time || '00:00:00.000').split(':');
+            let [ss, sms] = (ssms || '00.000').split('.');
+            // 拆分 end_time
+            let [eh, em, esms] = (scene.end_time || '00:00:00.000').split(':');
+            let [es, ems] = (esms || '00.000').split('.');
+            return {
+              ...scene,
+              start_h: sh || '00',
+              start_m: sm || '00',
+              start_s: ss || '00',
+              start_ms: sms || '000',
+              end_h: eh || '00',
+              end_m: em || '00',
+              end_s: es || '00',
+              end_ms: ems || '000',
+              _id: scene._id || ''
+            };
+          });
         }
       }
     }
@@ -407,25 +582,58 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-shrink: 1;
-  min-width: 0;
+}
+.time-range-separator {
+  color: #888;
+  font-size: 12px;
+  margin: 0 0.5px;
+  user-select: none;
+  font-family: 'Roboto Mono', 'Menlo', 'Consolas', monospace;
 }
 
-.time-input {
-  width: 120px;
-  min-width: 100px;
-  padding: 8px 4px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  font-family: 'Roboto Mono', monospace;
-  font-size: 13px;
-  text-align: center;
-  letter-spacing: 0px;
-}
-
-.time-separator {
+.time-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: transparent;
+  border-radius: 5px;
+  border: 1.2px solid #e0e0e0;
   padding: 0 2px;
 }
+
+.time-part {
+  width: 1.3em;
+  height: 2em;
+  background: transparent;
+  border: none;
+  color: #222;
+  text-align: center;
+  font-size: 12px;
+  font-family: 'Roboto Mono', 'Menlo', 'Consolas', monospace;
+  font-weight: 500;
+  letter-spacing: 0;
+  outline: none;
+  margin: 0 0;
+  padding: 5px 0;
+  box-sizing: border-box;
+}
+.time-part.ms {
+  width: 2em;
+}
+
+.timecode-separator {
+  font-size: 12px;
+  font-family: 'Roboto Mono', 'Menlo', 'Consolas', monospace;
+  font-weight: 500;
+  color: #aaa;
+  margin: 0 0;
+  user-select: none;
+  letter-spacing: 0;
+}
+
+/* .time-separator {
+  padding: 0 0;
+} */
 
 .scene-content {
   margin-bottom: 8px;
@@ -433,14 +641,14 @@ export default {
 
 .scene-description {
   width: 100%;
-  min-height: 120px;
-  padding: 16px;
+  min-height: 140px;
+  padding: 14px;
   border: none;                /* 去掉边框 */
   border-radius: 8px;          /* 圆角可保留 */
   background: #f7f7fa;   /* 一直有淡灰色背景 */
   font-family: inherit;
   line-height: 1.6;
-  font-size: 15px;
+  font-size: 14px;
   color: #1f2937;
   box-shadow: none;            /* 去掉阴影 */
   resize: vertical;
@@ -465,9 +673,9 @@ export default {
 }
 
 .control-btn {
-  width: 32px;
-  height: 32px;
-  padding: 4px;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   background-color: white;
@@ -506,7 +714,7 @@ export default {
 }
 
 .material-icons {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 /* 占位符文本样式 */
@@ -526,6 +734,28 @@ export default {
 .error {
   color: #dc2626;
   background: #fef2f2;
+}
+
+.play-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: 0 4px;
+  border: none;
+  background: none;
+  color: #047ebf;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+.play-btn:hover {
+  background: #e3f2fd;
+}
+.play-btn .material-icons {
+  font-size: 16px;
 }
 
 /* 响应式调整 */

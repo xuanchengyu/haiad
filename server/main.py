@@ -1192,8 +1192,8 @@ def generate_scene_description(current_user):
                     combined_descriptions[0],
                     combined_descriptions[1],
                     combined_descriptions[2],
-                    combined_descriptions[3],
-                    combined_descriptions[4]
+                    # combined_descriptions[3],
+                    # combined_descriptions[4]
                     ]
 
             })
@@ -1389,8 +1389,8 @@ def generate_scene_description2(current_user):
                     combined_descriptions[0],
                     combined_descriptions[1],
                     combined_descriptions[2],
-                    combined_descriptions[3],
-                    combined_descriptions[4]
+                    # combined_descriptions[3],
+                    # combined_descriptions[4]
                     ]
 
             })

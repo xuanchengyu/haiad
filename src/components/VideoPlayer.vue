@@ -1,5 +1,7 @@
 <template>
-  <div class="video-player">
+  <div class="video-player"
+       @mouseenter="isPlayerActive = true"
+       @mouseleave="isPlayerActive = false">
     <video
       ref="videoRef"
       class="video-js vjs-custom-theme"
@@ -26,7 +28,14 @@
           <button @click="skipBackward(1)" class="control-button">≪</button>
           <button @click="skipForward(1)" class="control-button">≫</button>
           <div class="time-display">
-            {{ currentTimeFormatted }} / {{ durationFormatted }}
+            <span
+              class="current-time-text copy-on-hover"
+              @click="copyCurrentTime"
+              title="Click to copy"
+            >
+              {{ currentTimeFormatted }}
+            </span>
+            <span> / {{ durationFormatted }}</span>
           </div>
         </div>
         <div class="right-controls">
@@ -65,7 +74,10 @@ export default {
       showSeekPreview: false,
       seekPreviewPosition: 0,
       seekPreviewTime: '00:00:00.000',
-      animationFrameId: null
+      animationFrameId: null,
+      copied: false,
+      copyTimeout: null,
+      isPlayerActive: false // 新增：播放器激活状态
     }
   },
   computed: {
@@ -238,6 +250,51 @@ export default {
 
     getCurrentTime() {
       return this.player ? this.player.currentTime() : 0;
+    },
+
+    copyCurrentTime() {
+      const time = this.currentTimeFormatted;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(time);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = time;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    },
+
+    playSegment(start, end) {
+      if (!this.player) return;
+      const startSec = this.parseTime(start);
+      const endSec = this.parseTime(end);
+      if (isNaN(startSec) || isNaN(endSec) || endSec <= startSec) return;
+      this.player.currentTime(startSec);
+      this.player.play();
+      if (this._segmentInterval) {
+        clearInterval(this._segmentInterval);
+      }
+      this._segmentInterval = setInterval(() => {
+        if (this.player.currentTime() >= endSec) {
+          this.player.pause();
+          clearInterval(this._segmentInterval);
+          this._segmentInterval = null;
+        }
+      }, 100);
+    },
+
+    handleKeydown(e) {
+      if (!this.isPlayerActive) return;
+      if (e.key === 'ArrowLeft') {
+        this.skipBackward(1);
+        e.preventDefault();
+      }
+      if (e.key === 'ArrowRight') {
+        this.skipForward(1);
+        e.preventDefault();
+      }
     }
   },
   watch: {
@@ -250,13 +307,22 @@ export default {
       immediate: true
     }
   },
+  mounted() {
+    window.addEventListener('keydown', this.handleKeydown);
+  },
   beforeUnmount() {
+    window.removeEventListener('keydown', this.handleKeydown);
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
     }
     document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
     if (this.player) {
       this.player.dispose();
+    }
+    clearTimeout(this.copyTimeout);
+    if (this._segmentInterval) {
+      clearInterval(this._segmentInterval);
+      this._segmentInterval = null;
     }
   }
 }
@@ -439,5 +505,21 @@ export default {
 
 .video-player:fullscreen .progress-bar:hover {
   height: 6px;
+}
+
+.copy-on-hover {
+  cursor: pointer;
+  user-select: all;
+  border-radius: 6px;
+  transition: background 0.25s, color 0.2s, box-shadow 0.25s;
+  position: relative;
+  z-index: 1;
+  background: none;
+  color: inherit;
+}
+.copy-on-hover:hover {
+  background: #f5f5f5;
+  color: #111;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 </style> 

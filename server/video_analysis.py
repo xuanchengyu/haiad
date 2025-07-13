@@ -139,14 +139,28 @@ def generate_clip_description(clip_path, creativity, num_frames=2, max_retries=1
         image_files = [convert_to_base64(image) for image in images]
 
         content = []
+        # prompt = ("You are an expert in understanding scene transitions based on visual features in a video. "
+        #           "For the given sequence of images per timestamp, identify different scenes in the video. "
+        #           "Generate pure audio description for each scene with time ranges.\n"
+        # )
+        # prompt = (
+        #     "You are an expert in analyzing video scenes. "
+        #     "Please analyze the provided images and describe what you see in the scene. "
+        #     "Write a clear, coherent description in English only as a single paragraph. "
+        #     "Focus on the visual elements, actions, and atmosphere. "
+        #     "Keep your response concise and well-structured, and avoid unnecessary line breaks or formatting. "
+        #     "Do not include any code formatting, special characters, or non-English text.\n"
+        # )
+
         prompt = (
-            "You are an expert in analyzing video scenes. "
-            "Please analyze the provided images and describe what you see in the scene. "
-            "Write a clear, coherent description in English only as a single paragraph. "
-            "Focus on the visual elements, actions, and atmosphere. "
-            "Keep your response concise and well-structured, and avoid unnecessary line breaks or formatting. "
-            "Do not include any code formatting, special characters, or non-English text.\n"
-        )
+            "You are an expert in analyzing video scenes "
+            "Given a sequence of video keyframes with timestamps, identify different scenes in the video. "
+            "For each identified scene, generate a description summarising what happens in that scene.\n\n"
+    
+            "Please return the description for each sceneas a Python List of dictionaries, where each dictionary contains: \n"
+            "{time_range (str), description (str)}\n\n"
+            "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
+)
 
         content.append({"type": "text", "text": prompt})
         for image_file in image_files:
@@ -211,25 +225,51 @@ def generate_script_2(clip_descriptions, max_retries=100):
         #     "{description_number (str), start_time (str, format: HH:MM:SS.mmm), end_time (str, format: HH:MM:SS.mmm), description (str)} \n\n"
         #     "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
         # )
-
+        # prompt = ("You are an expert at understanding audio descriptions of different scenes in a video. "
+        #     "Generate a coherent and full audio description of each scene with non-overlapping time ranges. "
+        #     "Keep as many scenes as possible covering all time ranges. "
+        #     "Use character names wherever possible in the audio descriptions. "
+        #     "Keep the audio description for each time range within one short sentence. "
+        #     "Ensure the audio description do not overlap with original dialogues. \n\n"
+        # )
         prompt = (
-            "You are an expert in writing audio descriptions for videos. "
-            "Based on the given content, please generate audio descriptions in 5 distinct writing styles. "
-            "Each description should be a clear, well-structured paragraph in English only. "
-            "Focus on describing what you see in the scene with appropriate detail. "
+            "You are an expert at writing audio descriptions (AD) for video clips. "
+            
+            "Below is a list of short AD snippets covering different time ranges within the same video clip. "
+            "Your task is to synthesize these fragmented descriptions and rewrite them into a coherent AD of the entire clip, in 3 different writing styles.\n\n"
+
+            "The three styles are:\n"
+            "1. Objective - factual and straightforward\n"
+            "2. Descriptive - detailed and vivid\n"
+            "3. Child-Friendly - simple and easy to understand\n\n"
+            
+            "For each style, return a well-structured description composed of several short sentences. "
             "Do not include any special characters, code formatting, or non-English text.\n\n"
-            
-            "The five styles are:\n"
-            "1. Concise and Objective – minimal adjectives, factual tone.\n"
-            "2. Descriptive and Evocative – uses rich imagery and sensory language.\n"
-            "3. Conversational and Informal – casual, friendly tone.\n"
-            "4. Interpretive or Emotive – reflects mood, emotion, or intention.\n"
-            "5. Child-Friendly and Simplified – simple, playful, age-appropriate vocabulary.\n\n"
-            
-            "Please return the five audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
+
+            "Please return the 3 audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
             "{description_number (str), description (str)}\n\n"
             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
-        )
+    )
+
+
+        # prompt = (
+        #     "You are an expert at understanding audio descriptions of different scenes in a video."
+        #     "Based on the given content, please generate a coherent and full audio descriptions in 5 distinct writing styles. "
+        #     "Keep as many scenes as possible covering all time ranges. "
+        #     "Keep the audio description for each time range within one short sentence. "
+        #     "Each description should be a clear, well-structured paragraph in English only. "
+            
+        #     "The five styles are:\n"
+        #     "1. Objective.\n"
+        #     "2. Descriptive.\n"
+        #     "3. Conversational and Informal.\n"
+        #     "4. Interpretive.\n"
+        #     "5. Child-Friendly and Simplified.\n\n"
+            
+        #     "Please return the five audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
+        #     "{description_number (str), description (str)}\n\n"
+        #     "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
+        # )
 
         prompt += "\n\n".join(clip_descriptions)
 
@@ -330,12 +370,16 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
         # )
 
         prompt = (
-            "You are an expert in writing clear, coherent audio descriptions for video scenes. "
-            "Based on the given content, please generate 5 different audio descriptions.\n\n"
-            "Each description should be a clear, well-structured paragraph in English only. "
-            "Focus on describing what you see in the scene with appropriate detail. "
+            "You are an expert in writing high-quality audio descriptions (AD) for video clips. "
+
+            "Below is a list of short AD snippets covering different time ranges within the same video clip. "
+            "Your task is to synthesize these fragmented descriptions and rewrite them into a coherent AD of the entire clip, in 3 different versions.\n\n"
+
+            "You should rewrite them in 3 different versions based on the user-defined style and insructions."
+            "For each style, return a well-structured description composed of several short sentences. "
             "Do not include any special characters, code formatting, or non-English text.\n\n"
-            "Please return the 5 audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
+
+            "Please return the 3 audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
             "{description_number (str), description (str)}\n\n"
             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
     )

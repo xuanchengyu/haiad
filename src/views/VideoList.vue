@@ -74,7 +74,7 @@
                 </span>
                 <span class="script-status" :class="{ 'has-script': video.has_script }">
                   <i class="fas" :class="video.has_script ? 'fa-check-circle' : 'fa-clock'"></i>
-                  {{ video.has_script ? 'Script Ready' : 'Pending' }}
+                  {{ video.has_script ? 'Pending' : 'New' }}
                 </span>
               </div>
             </div>
