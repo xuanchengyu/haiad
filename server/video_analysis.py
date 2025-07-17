@@ -373,18 +373,18 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
             "You are an expert in writing high-quality audio descriptions (AD) for video clips. "
 
             "Below is a list of short AD snippets covering different time ranges within the same video clip. "
-            "Your task is to synthesize these fragmented descriptions and rewrite them into a coherent AD of the entire clip, in 3 different versions.\n\n"
+            "Your task is to synthesize these fragmented descriptions and rewrite them into a coherent AD of the entire clip.\n\n"
 
             "You should rewrite them in 3 different versions based on the user-defined style and insructions."
-            "For each style, return a well-structured description composed of several short sentences. "
+            "For each version, return a well-structured description composed of several short sentences. "
             "Do not include any special characters, code formatting, or non-English text.\n\n"
 
-            "Please return the 3 audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
+            "Please return the 3 versions ofaudio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
             "{description_number (str), description (str)}\n\n"
             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
     )
         
-
+        
         prompt += "\n\n".join(clip_descriptions)
         if selected_keywords:
             prompt += "\n\nThe user-defined style should be:\n" + ", ".join(selected_keywords)

@@ -23,116 +23,137 @@ from PIL import Image
 import requests
 from base64 import b64decode
 import re
+import boto3
+from botocore.exceptions import ClientError
+import hashlib
+from datetime import datetime, timezone
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
 from .video_analysis import generate_clip_description, split_video_segment, generate_script_2, generate_script_with_instruction, frame_number
 
-# from .video_analysis import scene_detection, split_video, speech_recognition, generate_clip_descriptions, generate_clip_description,generate_script,split_video_segment,generate_descriptions,generate_script_2,generate_script_with_instruction
-# from .draft.ai_assistant import chat_with_ai
-# from .toggle_chat import handle_scene_chat
-
-# ============================
-# 本地便捷测试数据库
-
-
-
-
-
-
-
-
-
-# from urllib3.util.retry import Retry
-# from requests.adapters import HTTPAdapter
-
-# retry_strategy = Retry(
-#     total=5,  # 总重试次数
-#     backoff_factor=1,  # 指数退避因子
-#     status_forcelist=[500, 502, 503, 504],  # 触发重试的HTTP状态码
-#     allowed_methods=["GET"]  # 仅对GET请求重试
-# )
-
-# session = requests.Session()
-# session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
-# response = session.get(video_url, stream=True)
-
-
-
-
-
-
-
-
-
-
-
 # =====================================
 
+# Cloudflare R2 配置
+R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID', "86e5075db5108227c5f1cf3a232e2b39")
+R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', "812028cb0ba05a91212e6736cc9d9320a5bd55cf05450bd32cfa57df30a8c474")
+R2_ACCOUNT_ID = os.environ.get('R2_ACCOUNT_ID', "6290a475a5f7f7788693c04d408474d5")
+R2_BUCKET_NAME = os.environ.get('R2_BUCKET_NAME', "haiad-videos")
+R2_ENDPOINT_URL = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+R2_PUBLIC_URL = os.environ.get('R2_PUBLIC_URL', "https://haiad.app")
 
-# Bunny.net 配置
-BUNNY_STORAGE_ZONE = "haiad-videos"
-BUNNY_API_KEY = "c534ac77-9ed3-45fd-bfd39ab774b6-f43c-440e"  # Bunny.net API Key
-BUNNY_STORAGE_URL = f"https://storage.bunnycdn.com/{BUNNY_STORAGE_ZONE}/"
-BUNNY_CDN_URL = "https://haiadvideos.b-cdn.net/"
+# 本地缓存配置
+CACHE_DIR = os.environ.get('CACHE_DIR', '/tmp/video_cache')
+os.makedirs(CACHE_DIR, exist_ok=True)
 
-# Bunny.net 上传函数
-def upload_to_bunny(file, storage_path):
-    """上传文件到 Bunny.net Storage Zone"""
+def get_cached_video_path(video_url):
+    """
+    获取缓存的视频文件路径，如果不存在则下载
+    """
+    # 使用URL的hash作为缓存文件名
+    url_hash = hashlib.md5(video_url.encode()).hexdigest()
+    cache_path = os.path.join(CACHE_DIR, f"{url_hash}.mp4")
+    
+    # 如果缓存文件存在且大小大于0，直接返回
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        print(f"使用缓存文件: {cache_path}")
+        return cache_path
+    
+    # 否则下载文件到缓存
+    print(f"下载视频到缓存: {video_url}")
     try:
-        headers = {
-            'AccessKey': BUNNY_API_KEY,
-            'Content-Type': 'application/octet-stream'
-        }
+        response = requests.get(video_url, stream=True)
+        response.raise_for_status()
+        
+        with open(cache_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        
+        print(f"视频已缓存到: {cache_path}")
+        return cache_path
+        
+    except Exception as e:
+        print(f"下载视频失败: {str(e)}")
+        # 如果缓存文件存在但下载失败，删除损坏的缓存文件
+        if os.path.exists(cache_path):
+            os.remove(cache_path)
+        raise e
+
+# 初始化R2客户端
+def get_r2_client():
+    """获取R2客户端"""
+    session = boto3.session.Session()
+    return session.client(
+        service_name='s3',
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        endpoint_url=R2_ENDPOINT_URL
+    )
+
+# R2 上传函数
+def upload_to_r2(file, storage_path):
+    """上传文件到 Cloudflare R2"""
+    try:
+        s3_client = get_r2_client()
         
         # 读取文件内容
         file.seek(0)
         file_content = file.read()
         
-        # 上传到 Bunny.net
-        upload_url = f"{BUNNY_STORAGE_URL}{storage_path}"
-        response = requests.put(upload_url, data=file_content, headers=headers)
+        # 上传到 R2
+        response = s3_client.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=storage_path,
+            Body=file_content,
+            ContentType='application/octet-stream'
+        )
         
-        if response.status_code == 201:
-            # 返回 CDN URL
-            cdn_url = f"{BUNNY_CDN_URL}{storage_path}"
+        if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+            # 返回公共访问URL
+            public_url = f"{R2_PUBLIC_URL}/{storage_path}"
             return {
                 'success': True,
-                'cdn_url': cdn_url,
+                'cdn_url': public_url,
                 'storage_path': storage_path
             }
         else:
-            print(f"Bunny.net 上传失败: {response.status_code} - {response.text}")
-            return {'success': False, 'error': response.text}
+            print(f"R2 上传失败: {response}")
+            return {'success': False, 'error': 'Upload failed'}
             
+    except ClientError as e:
+        print(f"R2 上传错误: {str(e)}")
+        return {'success': False, 'error': str(e)}
     except Exception as e:
-        print(f"Bunny.net 上传错误: {str(e)}")
+        print(f"R2 上传错误: {str(e)}")
         return {'success': False, 'error': str(e)}
 
-def delete_from_bunny(storage_path):
-    """从 Bunny.net 删除文件"""
+def delete_from_r2(storage_path):
+    """从 R2 删除文件"""
     try:
-        headers = {
-            'AccessKey': BUNNY_API_KEY
-        }
+        s3_client = get_r2_client()
         
-        delete_url = f"{BUNNY_STORAGE_URL}{storage_path}"
-        response = requests.delete(delete_url, headers=headers)
+        response = s3_client.delete_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=storage_path
+        )
         
-        if response.status_code == 200:
+        if response['ResponseMetadata']['HTTPStatusCode'] == 204:
             return True
         else:
-            print(f"Bunny.net 删除失败: {response.status_code} - {response.text}")
+            print(f"R2 删除失败: {response}")
             return False
             
+    except ClientError as e:
+        print(f"R2 删除错误: {str(e)}")
+        return False
     except Exception as e:
-        print(f"Bunny.net 删除错误: {str(e)}")
+        print(f"R2 删除错误: {str(e)}")
         return False
 
 # MongoDB atlas
-uri = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority&appName=haiad"
+uri = "mongodb+srv://juneyxc:GzJjSY7HzROoZrWZ@haiad.jscuo.mongodb.net/?retryWrites=true&w=majority"
 client = MongoClient(uri, server_api=ServerApi('1'))
 db = client['haiad']
-
 
 # 集合定义
 videos_collection = db['videos']        # 存储视频信息
@@ -140,7 +161,6 @@ scripts_collection = db['scripts']      # 存储脚本信息
 users_collection = db['users']  # 使用users集合
 users_collection.create_index('username', unique=True) # 创建用户名索引确保唯一性
 chat_logging_collection = db['chat_logging']  # 存储LOG日志
-
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -166,7 +186,6 @@ class MongoJSONEncoder(json.JSONEncoder):
 
 # 配置 Flask 使用自定义 JSON 编码器
 app.json_encoder = MongoJSONEncoder
-
 
 # 添加token验证装饰器
 def token_required(f):
@@ -210,79 +229,60 @@ def generate_thumbnail(current_user, file, video_id):
     try:
         # 从数据库获取视频信息
         video = videos_collection.find_one({'_id': ObjectId(video_id)})
-        if not video or 'bunny_url' not in video:
+        if not video or 'r2_url' not in video:
             raise Exception('Video URL not found')
 
-        video_url = video['bunny_url']
+        video_url = video['r2_url']
         
-        # 创建临时目录
-        temp_dir = tempfile.mkdtemp()
-        temp_video_path = os.path.join(temp_dir, f"temp_video_{video_id}.mp4")
+        # 使用缓存系统获取视频文件
+        cached_video_path = get_cached_video_path(video_url)
         
-        try:
-            # 使用 requests 下载视频
-            response = requests.get(video_url, stream=True)
-            response.raise_for_status()
-            
-            # 保存视频到临时文件
-            with open(temp_video_path, 'wb') as temp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        temp_file.write(chunk)
+        print(f"使用缓存视频生成缩略图: {cached_video_path}")
 
-            print(f"视频已下载到临时文件: {temp_video_path}")
+        # 验证文件是否存在和可读
+        if not os.path.exists(cached_video_path):
+            raise Exception(f"缓存文件不存在: {cached_video_path}")
 
-            # 验证文件是否存在和可读
-            if not os.path.exists(temp_video_path):
-                raise Exception(f"临时文件不存在: {temp_video_path}")
+        # 使用 OpenCV 读取视频
+        cap = cv2.VideoCapture(cached_video_path)
+        if not cap.isOpened():
+            raise Exception("无法打开视频文件")
 
-            # 使用 OpenCV 读取视频
-            cap = cv2.VideoCapture(temp_video_path)
-            if not cap.isOpened():
-                raise Exception("无法打开视频文件")
+        ret, frame = cap.read()
+        if not ret:
+            raise Exception("无法读取视频帧")
 
-            ret, frame = cap.read()
-            if not ret:
-                raise Exception("无法读取视频帧")
+        # 生成缩略图
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image = Image.fromarray(rgb_frame)
+        image.thumbnail((320, 180))
 
-            # 生成缩略图
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(rgb_frame)
-            image.thumbnail((320, 180))
+        # 将图片转换为字节流
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='JPEG')
+        img_byte_arr.seek(0)
 
-            # 将图片转换为字节流
-            img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format='JPEG')
-            img_byte_arr.seek(0)
-
-            # 上传缩略图到 Bunny.net
-            timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
-            thumbnail_path = f"users/{str(current_user['_id'])}/thumbnails/thumb_{video_id}_{timestamp}.jpg"
-            
-            # 创建缩略图上传请求
-            headers = {
-                'AccessKey': BUNNY_API_KEY,
-                'Content-Type': 'image/jpeg'
-            }
-            
-            upload_url = f"{BUNNY_STORAGE_URL}{thumbnail_path}"
-            response = requests.put(upload_url, data=img_byte_arr.getvalue(), headers=headers)
-            
-            if response.status_code == 201:
-                thumbnail_url = f"{BUNNY_CDN_URL}{thumbnail_path}"
-                cap.release()
-                return thumbnail_url
-            else:
-                print(f"缩略图上传失败: {response.status_code} - {response.text}")
-                cap.release()
-                return None
-
-        finally:
-            # 清理临时文件和目录
-            if os.path.exists(temp_video_path):
-                os.unlink(temp_video_path)
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
+        # 上传缩略图到 R2
+        timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
+        thumbnail_path = f"users/{str(current_user['_id'])}/thumbnails/thumb_{video_id}_{timestamp}.jpg"
+        
+        # 上传缩略图到R2
+        s3_client = get_r2_client()
+        response = s3_client.put_object(
+            Bucket=R2_BUCKET_NAME,
+            Key=thumbnail_path,
+            Body=img_byte_arr.getvalue(),
+            ContentType='image/jpeg'
+        )
+        
+        if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+            thumbnail_url = f"{R2_PUBLIC_URL}/{thumbnail_path}"
+            cap.release()
+            return thumbnail_url
+        else:
+            print(f"缩略图上传失败: {response}")
+            cap.release()
+            return None
 
     except Exception as e:
         print(f"生成缩略图错误: {str(e)}")
@@ -322,13 +322,13 @@ def upload_video(current_user):
                 timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
                 storage_path = f"users/{str(current_user['_id'])}/videos/{timestamp}_{filename}"
                 
-                # 上传到 Bunny.net
-                upload_result = upload_to_bunny(file, storage_path)
+                # 上传到 R2
+                upload_result = upload_to_r2(file, storage_path)
 
-                print(f"Bunny.net 上传结果: {upload_result}")
+                print(f"R2 上传结果: {upload_result}")
 
                 if not upload_result or not upload_result.get('success'):
-                    raise Exception(f'Failed to upload to Bunny.net: {upload_result.get("error", "Unknown error")}')
+                    raise Exception(f'Failed to upload to R2: {upload_result.get("error", "Unknown error")}')
 
                 # 创建视频记录
                 video_id = videos_collection.insert_one({
@@ -337,8 +337,8 @@ def upload_video(current_user):
                     'original_filename': file.filename,
                     'created_at': datetime.now(UTC),
                     'has_script': False,
-                    'bunny_storage_path': upload_result['storage_path'],
-                    'bunny_url': upload_result['cdn_url']
+                    'r2_storage_path': upload_result['storage_path'],
+                    'r2_url': upload_result['cdn_url']
                 }).inserted_id
 
                 # 生成缩略图
@@ -381,13 +381,13 @@ def get_video(current_user, video_id):
         if not video:
             return jsonify({'error': '视频不存在或无权访问'}), 404
 
-        if 'bunny_url' not in video:
+        if 'r2_url' not in video:
             return jsonify({'error': '视频文件不存在'}), 404
             
-        # 返回视频的 Bunny.net URL
+        # 返回视频的 R2 URL
         return jsonify({
             'success': True,
-            'video_url': video.get('bunny_url'),
+            'video_url': video.get('r2_url'),
             'thumbnail_url': video.get('thumbnail_url', ''),
             'filename': video.get('original_filename', '')
         })
@@ -396,7 +396,6 @@ def get_video(current_user, video_id):
         print(f"获取视频错误: {str(e)}")
         traceback.print_exc()  # 添加详细错误日志
         return jsonify({'error': f'获取视频失败: {str(e)}'}), 500
-
 
 # 删除视频
 @app.route('/api/videos/<video_id>', methods=['DELETE'])
@@ -412,25 +411,25 @@ def delete_video(current_user, video_id):
         if not video:
             return jsonify({'success': False, 'error': '视频不存在或无权访问'}), 404
             
-        # 从 Bunny.net 删除视频
-        if 'bunny_storage_path' in video:
+        # 从 R2 删除视频
+        if 'r2_storage_path' in video:
             try:
-                result = delete_from_bunny(video['bunny_storage_path'])
+                result = delete_from_r2(video['r2_storage_path'])
                 print(f"视频删除结果: {result}")
             except Exception as e:
                 print(f"删除视频文件失败: {str(e)}")
             
-        # 从 Bunny.net 删除缩略图
+        # 从 R2 删除缩略图
         if 'thumbnail_url' in video:
             try:
-                # 从 CDN URL 提取存储路径
+                # 从公共URL提取存储路径
                 thumbnail_url = video['thumbnail_url']
-                # 从 CDN URL 中提取存储路径
-                # 例如: https://haiadvideos.b-cdn.net/users/xxx/thumbnails/thumb_xxx.jpg
-                storage_path = thumbnail_url.replace(BUNNY_CDN_URL, '')
+                # 从公共URL中提取存储路径
+                # 例如: https://your-custom-domain.com/users/xxx/thumbnails/thumb_xxx.jpg
+                storage_path = thumbnail_url.replace(f"{R2_PUBLIC_URL}/", '')
                 print(f"正在删除缩略图，storage_path: {storage_path}")
                 
-                result = delete_from_bunny(storage_path)
+                result = delete_from_r2(storage_path)
                 print(f"缩略图删除结果: {result}")
             except Exception as e:
                 print(f"删除缩略图失败: {str(e)}")
@@ -487,7 +486,7 @@ def get_videos(current_user):
             'status': video.get('status', 'ready'),
             'has_script': video.get('has_script', False),
             'created_at': video['created_at'].isoformat(),
-            'video_url': video.get('bunny_url', ''),
+            'video_url': video.get('r2_url', ''),
             'thumbnail_url': video.get('thumbnail_url', '')
         } for video in videos]
         
@@ -1072,26 +1071,20 @@ def generate_scene_description(current_user):
         if not video:
             return jsonify({'error': 'Video not found or access denied'}), 404
 
-        # 检查 Bunny.net URL
-        if 'bunny_url' not in video:
+        # 检查 R2 URL
+        if 'r2_url' not in video:
             return jsonify({'error': 'Video URL not found'}), 404
             
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
         os.makedirs(user_temp_dir, exist_ok=True)
 
-        # 从 Bunny.net 下载视频到临时文件
+        # 从 R2 下载视频到临时文件
         temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
         
         try:
-            # 使用 requests 下载视频
-            response = requests.get(video['bunny_url'], stream=True)
-            response.raise_for_status()  # 确保请求成功
-            
-            with open(temp_video_path, 'wb') as temp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        temp_file.write(chunk)
+            cached_video_path = get_cached_video_path(video['r2_url'])
+            temp_video_path = cached_video_path  # 直接使用缓存文件
 
             # 使用临时文件路径进行处理
             # scene = scene_detection(temp_video_path)
@@ -1212,13 +1205,7 @@ def generate_scene_description(current_user):
         return jsonify({'error': f'Failed to generate script: {str(e)}'}), 500
 
     finally:
-        # 清理临时文件和目录
-        if temp_video_path and os.path.exists(temp_video_path):
-            try:
-                os.unlink(temp_video_path)
-            except Exception as e:
-                print(f"Failed to delete temp video file: {str(e)}")
-                
+        # 清理临时目录（不删除缓存文件）
         if user_temp_dir and os.path.exists(user_temp_dir):
             try:
                 shutil.rmtree(user_temp_dir)
@@ -1272,26 +1259,18 @@ def generate_scene_description2(current_user):
         if not video:
             return jsonify({'error': 'Video not found or access denied'}), 404
 
-        # 检查 Bunny.net URL
-        if 'bunny_url' not in video:
+        # 检查 R2 URL
+        if 'r2_url' not in video:
             return jsonify({'error': 'Video URL not found'}), 404
             
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
         os.makedirs(user_temp_dir, exist_ok=True)
 
-        # 从 Bunny.net 下载视频到临时文件
-        temp_video_path = os.path.join(user_temp_dir, f"temp_video_{video_id}.mp4")
-        
+        # 使用缓存系统获取视频文件
         try:
-            # 使用 requests 下载视频
-            response = requests.get(video['bunny_url'], stream=True)
-            response.raise_for_status()  # 确保请求成功
-            
-            with open(temp_video_path, 'wb') as temp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        temp_file.write(chunk)
+            cached_video_path = get_cached_video_path(video['r2_url'])
+            temp_video_path = cached_video_path  # 直接使用缓存文件
 
             # 使用临时文件路径进行处理
             # scene = scene_detection(temp_video_path)
@@ -1408,14 +1387,7 @@ def generate_scene_description2(current_user):
         traceback.print_exc()
         return jsonify({'error': f'Failed to generate script: {str(e)}'}), 500
 
-    finally:
-        # 清理临时文件和目录
-        if temp_video_path and os.path.exists(temp_video_path):
-            try:
-                os.unlink(temp_video_path)
-            except Exception as e:
-                print(f"Failed to delete temp video file: {str(e)}")
-                
+    finally:          
         if user_temp_dir and os.path.exists(user_temp_dir):
             try:
                 shutil.rmtree(user_temp_dir)
