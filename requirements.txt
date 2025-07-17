@@ -2,7 +2,7 @@
 flask
 flask-cors
 gunicorn
-cloudinary
+requests
 
 # database
 pymongo
@@ -11,6 +11,9 @@ pymongo
 python-dotenv
 bcrypt
 PyJWT
+
+# cloud storage
+boto3
 
 # video processing
 moviepy
