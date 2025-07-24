@@ -34,7 +34,7 @@ export default {
   data() {
     return {
       username: '',
-      demoLink: "#" // 待替换为实际的使用说明书链接
+      demoLink: "https://haiad.app/help.mp4" // 待替换为实际的使用说明书链接
     }
   },
   created() {
