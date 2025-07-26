@@ -29,7 +29,7 @@ import hashlib
 from datetime import datetime, timezone
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
-from video_analysis import generate_clip_description, split_video_segment, generate_script_2, generate_script_with_instruction
+from .video_analysis import generate_clip_description, split_video_segment, generate_script_2, generate_script_with_instruction
 
 # =====================================
 
@@ -1410,6 +1410,6 @@ def generate_scene_description2(current_user):
 
 
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5002))
-    app.run(host='0.0.0.0', port=port, debug=True)
+# if __name__ == '__main__':
+#     port = int(os.environ.get('PORT', 5002))
+#     app.run(host='0.0.0.0', port=port, debug=True)
