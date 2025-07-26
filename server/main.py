@@ -29,7 +29,7 @@ import hashlib
 from datetime import datetime, timezone
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
-from .video_analysis import generate_clip_description, split_video_segment, generate_script_2, generate_script_with_instruction
+from video_analysis import generate_clip_description, split_video_segment, generate_script_2, generate_script_with_instruction
 
 # =====================================
 
@@ -394,7 +394,8 @@ def get_video(current_user, video_id):
             'success': True,
             'video_url': video.get('r2_url'),
             'thumbnail_url': video.get('thumbnail_url', ''),
-            'filename': video.get('original_filename', '')
+            'filename': video.get('original_filename', ''),
+            'video_context': video.get('video_context', '')  # 添加视频背景信息
         })
         
     except Exception as e:
@@ -1084,6 +1085,7 @@ def generate_scene_description(current_user):
             
         # 获取视频背景信息
         video_context = video.get('video_context', '')
+        print("视频背景信息是",video_context)
 
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
@@ -1242,6 +1244,7 @@ def generate_scene_description2(current_user):
         print(f"creativity的值: {creativity}, 类型: {type(creativity)}")
         selected_keywords = data.get('selected_keywords', [])  # 用户选择的风格按钮
         additional_instructions = data.get('additional_instructions', '')  # 用户输入内容
+        video_context = data.get('video_context', '')  # 视频背景信息
 
 
         print("接收到的参数:", {   
@@ -1250,7 +1253,8 @@ def generate_scene_description2(current_user):
         'end_time': data.get('end_time'),
         'creativity': data.get('creativity'),
         'selected_keywords':data.get('selected_keywords', []),
-        'additional_instructions':data.get('additional_instructions', '')
+        'additional_instructions':data.get('additional_instructions', ''),
+        'video_context': data.get('video_context', '')
         })
 
         if not video_id:
@@ -1275,6 +1279,7 @@ def generate_scene_description2(current_user):
             
         # 获取视频背景信息
         video_context = video.get('video_context', '')
+        print("视频背景信息是",video_context)
 
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
@@ -1410,6 +1415,6 @@ def generate_scene_description2(current_user):
 
 
 
-# if __name__ == '__main__':
-#     port = int(os.environ.get('PORT', 5002))
-#     app.run(host='0.0.0.0', port=port, debug=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5002))
+    app.run(host='0.0.0.0', port=port, debug=True)

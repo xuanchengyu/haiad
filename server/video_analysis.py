@@ -1,4 +1,4 @@
-from moviepy.video.io. VideoFileClip import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from scenedetect import SceneManager, ContentDetector, open_video
 import subprocess
@@ -134,8 +134,9 @@ def generate_clip_description(clip_path, creativity, max_retries=100, video_cont
     try:
         descriptions = []
         clip = VideoFileClip(clip_path)
-        # 使用场景检测的关键帧提取（无需指定帧数）
-        frames = scene_based_keyframe_extraction(clip)
+        # 使用混合帧提取策略
+        frames = hybrid_frame_extraction(clip)
+        print(f"Dynamic frame calculation: {len(frames)} frames for {clip.duration:.1f}s video")
         images = [Image.fromarray(frame) for frame in frames]
         image_files = [convert_to_base64(image) for image in images]
 
@@ -147,17 +148,15 @@ def generate_clip_description(clip_path, creativity, max_retries=100, video_cont
             "Given a sequence of video keyframes with timestamps, identify different scenes in the video. "
             "For each identified scene, provide a pure audio description in one short sentence. "
             "Only describe what you can actually see in the frames. Avoid subjective analysis.\n\n"
+
+            "Please return the description for each scene as a Python List of dictionaries, where each dictionary contains: \n"
+            "{time_range (str), description (str)}\n\n"
+            "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
         )
         
         # 如果有视频背景信息，添加到prompt中
         if video_context:
             prompt += f"Video Context: {video_context}\n\n"
-        
-        prompt += (
-            "Please return the description for each scene as a Python List of dictionaries, where each dictionary contains: \n"
-            "{time_range (str), description (str)}\n\n"
-            "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
-        )
 
         content.append({"type": "text", "text": prompt})
         for image_file in image_files:
@@ -169,11 +168,12 @@ def generate_clip_description(clip_path, creativity, max_retries=100, video_cont
         description = call_with_limit(content, max_retries)
         descriptions.append(description)
         clip.close()
-        return "".join(descriptions)
+        return "".join(descriptions)  # 返回列表而不是字符串
 
     except Exception as e:
         print(f"Generate clip description error: {str(e)}")
-        return "Cannot generate scene description."
+        # 返回一个有效的列表格式
+        return ["Error: Cannot generate scene description."]
 
 
 # 2.1 用AI根据音频描述，生成五条最终描述(Request AI description页面)
@@ -233,7 +233,7 @@ def generate_script_2(clip_descriptions, max_retries=100):
             "You are an expert at writing audio descriptions (AD) for video clips. "
             
             "Below is a list of short AD snippets covering different time ranges within the same video clip. "
-            "Your task is to synthesize and generate a full and coherent AD of the entire clip, in 3 different writing styles.\n\n"
+            "Your task is to synthesize all the AD snippets and generate a full and coherent AD of the entire clip, in 3 different writing styles.\n\n"
 
             "The three styles are:\n"
             "1. Objective - factual and straightforward\n"
@@ -371,11 +371,10 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
             "You are an expert in writing high-quality audio descriptions (AD) for video clips. "
 
             "Below is a list of short AD snippets covering different time ranges within the same video clip. "
-            "Your task is to synthesize and generate a full and coherent AD of the entire clip.\n\n"
+            "Your task is to synthesize all the AD snippets and generate a full and coherent AD of the entire clip.\n\n"
 
             "You should rewrite them in 3 different versions based on the user-defined style and insructions."
             "For each version, return a well-structured description composed of several short sentences. "
-            "Focus on key actions and objects. Avoid subjective analysis. "
             "Do not include any special characters, code formatting, or non-English text.\n\n"
 
             "Please return the 3 versions ofaudio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
@@ -397,26 +396,26 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
         return []
 
 
-# def calculate_dynamic_frames(duration_seconds):
-#     """
-#     动态计算抽帧数量 - 每3秒1帧，无差别处理
-#     """
-#     duration = int(duration_seconds)
+def calculate_dynamic_frames(duration_seconds):
+    """
+    动态计算抽帧数量 - 每3秒1帧，无差别处理
+    """
+    duration = int(duration_seconds)
     
-#     # 基础配置
-#     min_frames = 2
-#     max_frames = 60
+    # 基础配置
+    min_frames = 2
+    max_frames = 60
     
-#     # 处理不足3秒的情况
-#     if duration < 3:
-#         # 不足3秒的视频，至少抽2帧
-#         frames = min_frames
-#     else:
-#         # 每3秒1帧，无差别处理
-#         frames = duration // 3
+    # 处理不足3秒的情况
+    if duration < 3:
+        # 不足3秒的视频，至少抽2帧
+        frames = min_frames
+    else:
+        # 每3秒1帧，无差别处理
+        frames = duration // 3
     
-#     # 确保不超过最大帧数
-#     return min(frames, max_frames)
+    # 确保不超过最大帧数
+    return min(frames, max_frames)
 
 # def frame_number(start_str, end_str):
 #     """
@@ -454,135 +453,172 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
 #         # print(f"时间格式错误: {str(e)}")
 #         return 2
 
-def scene_based_keyframe_extraction(video_clip):
-    """
-    基于场景检测的关键帧提取 - 完全基于场景变化
-    """
-    try:
-        total_frames = int(video_clip.fps * video_clip.duration)
-        
-        # 检测场景变化点
-        scene_changes = detect_scene_changes_advanced(video_clip)
-        
-        # 如果没有检测到场景变化，使用基础采样
-        if not scene_changes:
-            print("No scene changes detected, using basic sampling")
-            # 根据视频长度决定采样数量
-            if total_frames <= 100:
-                num_frames = 2
-            elif total_frames <= 500:
-                num_frames = 4
-            else:
-                num_frames = 6
-            return sample_frames(video_clip, num_frames)
-        
-        # 保留所有检测到的场景变化，不限制数量
-        print(f"Using all {len(scene_changes)} detected scene changes")
-        
-        # 基于场景变化点选择关键帧
-        keyframes = select_key_frames(video_clip, scene_changes)
-        
-        # 限制总帧数，避免过多
-        max_frames = 15  # 从10增加到15，允许更多帧
-        if len(keyframes) > max_frames:
-            # 均匀选择最重要的帧
-            step = len(keyframes) // max_frames
-            keyframes = [keyframes[i] for i in range(0, len(keyframes), step)][:max_frames]
-            print(f"Limited keyframes to {max_frames} most important ones")
-        
-        print(f"Scene-based keyframes: {keyframes} (total: {len(keyframes)})")
-        frames = [video_clip.get_frame(i / video_clip.fps) for i in keyframes]
-        return frames
-        
-    except Exception as e:
-        print(f"Scene-based keyframe extraction error: {str(e)}")
-        # 降级到基础采样
-        if total_frames <= 100:
-            num_frames = 2
-        elif total_frames <= 500:
-            num_frames = 4
-        else:
-            num_frames = 6
-        return sample_frames(video_clip, num_frames)
-
-def detect_scene_changes_advanced(video_clip, threshold=0.40, min_scene_length=60):
-    """
-    高级场景变化检测 - 降低密度，提高质量
-    """
-    try:
-        total_frames = int(video_clip.fps * video_clip.duration)
-        changes = []
-        
-        # 增加采样间隔，降低检测密度
-        step = max(1, min(25, total_frames // 100))  # 从15增加到25
-        
-        prev_frame = None
-        last_change = 0
-        
-        for i in range(0, total_frames, step):
-            current_frame = video_clip.get_frame(i / video_clip.fps)
+# def action_based_keyframe_selection(video_clip):
+#     """
+#     纯动作检测 - 基于动作强度选择关键帧
+#     """
+#     total_frames = int(video_clip.fps * video_clip.duration)
+#     action_scores = []
+    
+#     # 检查每一帧的动作强度
+#     for i in range(0, total_frames, 10):  # 每10帧检查一次
+#         if i >= total_frames:
+#             break
             
-            if prev_frame is not None:
-                # 计算帧间差异
-                diff = np.mean(np.abs(current_frame - prev_frame))
-                
-                # 提高阈值，增加最小场景长度，减少误检
-                if diff > threshold * 255 and (i - last_change) >= min_scene_length:
-                    changes.append(i)
-                    last_change = i
+#         try:
+#             current_frame = video_clip.get_frame(i / video_clip.fps)
             
-            prev_frame = current_frame
-        
-        print(f"Detected {len(changes)} scene changes at frames: {changes}")
-        return changes
-        
-    except Exception as e:
-        print(f"Advanced scene change detection error: {str(e)}")
-        return []
+#             # 计算与前后帧的差异（动作强度）
+#             action_score = 0
+#             if i > 0:
+#                 prev_frame = video_clip.get_frame((i - 10) / video_clip.fps)
+#                 action_score += np.mean(np.abs(current_frame - prev_frame))
+            
+#             if i < total_frames - 1:
+#                 next_frame = video_clip.get_frame((i + 10) / video_clip.fps)
+#                 action_score += np.mean(np.abs(current_frame - next_frame))
+            
+#             action_scores.append((i, action_score))
+#         except:
+#             continue
+    
+#     # 选择动作强度最高的帧
+#     action_scores.sort(key=lambda x: x[1], reverse=True)
+    
+#     # 选择前6个最高动作强度的帧
+#     keyframes = [0]  # 起始帧
+#     for frame_idx, score in action_scores[:6]:
+#         keyframes.append(frame_idx)
+    
+#     keyframes.append(total_frames - 1)  # 结束帧
+#     keyframes = sorted(list(set(keyframes)))
+    
+#     # 转换为实际的帧
+#     frames = [video_clip.get_frame(i / video_clip.fps) for i in keyframes]
+    
+#     print(f"Action-based keyframes: {keyframes} (total: {len(keyframes)})")
+#     return frames
 
-def select_key_frames(video_clip, scene_changes):
+def hybrid_frame_extraction(video_clip):
     """
-    选择更关键的帧 - 基于动作和变化的重要性
+    混合策略：动态帧数 + 动作检测补充
     """
-    key_frames = []
     total_frames = int(video_clip.fps * video_clip.duration)
+    video_duration = video_clip.duration
     
-    # 添加起始帧
-    key_frames.append(0)
+    # 1. 基础动态帧数
+    base_frames = calculate_dynamic_frames(video_duration)
     
-    for change_frame in scene_changes:
-        # 在场景变化点附近选择最关键的帧
-        start_search = max(0, change_frame - 20)
-        end_search = min(total_frames - 1, change_frame + 20)
-        
-        best_frame = change_frame
-        max_importance = 0
-        
-        # 在变化点前后20帧内寻找最关键的帧
-        for i in range(start_search, end_search + 1, 5):  # 每5帧检查一次
-            if i >= total_frames:
-                break
-                
-            current_frame = video_clip.get_frame(i / video_clip.fps)
+    # 2. 动作检测 - 选择动作强度最高的帧
+    action_scores = []
+    
+    # 预加载帧，避免重复读取
+    frame_cache = {}
+    
+    # 检查每一帧的动作强度 - 提高采样频率
+    for i in range(0, total_frames, 5):  # 每5帧检查一次（之前是10）
+        if i >= total_frames:
+            break
             
-            # 计算帧的重要性（基于与前后帧的差异）
-            importance = 0
+        try:
+            # 缓存当前帧
+            if i not in frame_cache:
+                frame_cache[i] = video_clip.get_frame(i / video_clip.fps)
+            current_frame = frame_cache[i]
+            
+            # 计算与前后帧的差异（动作强度）
+            action_score = 0
             if i > 0:
-                prev_frame = video_clip.get_frame((i - 5) / video_clip.fps)
-                importance += np.mean(np.abs(current_frame - prev_frame))
+                prev_idx = i - 5
+                if prev_idx not in frame_cache:
+                    frame_cache[prev_idx] = video_clip.get_frame(prev_idx / video_clip.fps)
+                prev_frame = frame_cache[prev_idx]
+                action_score += np.mean(np.abs(current_frame - prev_frame))
             
             if i < total_frames - 1:
-                next_frame = video_clip.get_frame((i + 5) / video_clip.fps)
-                importance += np.mean(np.abs(current_frame - next_frame))
+                next_idx = i + 5
+                if next_idx not in frame_cache:
+                    frame_cache[next_idx] = video_clip.get_frame(next_idx / video_clip.fps)
+                next_frame = frame_cache[next_idx]
+                action_score += np.mean(np.abs(current_frame - next_frame))
             
-            # 选择重要性最高的帧
-            if importance > max_importance:
-                max_importance = importance
-                best_frame = i
+            action_scores.append((i, action_score))
+        except:
+            continue
+    
+    # 选择动作强度最高的帧
+    action_scores.sort(key=lambda x: x[1], reverse=True)
+    
+    # 3. 合并策略：基础帧 + 动作帧
+    all_frames = []
+    added_times = []  # 记录已添加帧的时间
+    
+    # 先添加基础均匀采样帧
+    uniform_frames = sample_frames(video_clip, base_frames)
+    all_frames.extend(uniform_frames)
+    
+    # 计算基础帧的时间点
+    for i, frame in enumerate(uniform_frames):
+        frame_time = (i * video_duration) / base_frames
+        added_times.append(frame_time)
+    
+    # 再添加动作帧（避免重复）
+    action_frames_added = 0
+    max_action_frames = min(5, base_frames // 2)  # 增加动作帧数量，最多5个
+    # max_action_frames = 5
+    
+    for frame_idx, score in action_scores:
+        if action_frames_added >= max_action_frames:
+            break
+            
+        # 检查是否与现有帧重复（时间接近）
+        frame_time = frame_idx / video_clip.fps
+        is_duplicate = False
         
-        key_frames.append(best_frame)
+        for added_time in added_times:
+            if abs(frame_time - added_time) < 1.0:  # 1秒内认为是重复
+                is_duplicate = True
+                break
+        
+        if not is_duplicate:
+            try:
+                # 使用缓存的帧
+                if frame_idx in frame_cache:
+                    frame = frame_cache[frame_idx]
+                else:
+                    frame = video_clip.get_frame(frame_idx / video_clip.fps)
+                all_frames.append(frame)
+                added_times.append(frame_time)
+                action_frames_added += 1
+            except Exception as e:
+                print(f"Error reading action frame {frame_idx}: {str(e)}")
+                continue
     
-    # 添加结束帧
-    key_frames.append(total_frames - 1)
+    # 按时间顺序重新排列帧
+    frame_time_pairs = []
+    frame_idx = 0
     
-    return sorted(list(set(key_frames)))
+    # 为每个帧计算时间
+    for i, frame in enumerate(all_frames):
+        if i < len(uniform_frames):
+            # 基础帧的时间
+            frame_time = (i * video_duration) / base_frames
+        else:
+            # 动作帧的时间
+            action_frame_idx = i - len(uniform_frames)
+            if action_frame_idx < len(added_times) - len(uniform_frames):
+                frame_time = added_times[len(uniform_frames) + action_frame_idx]
+            else:
+                frame_time = video_duration  # 默认放在最后
+        
+        frame_time_pairs.append((frame_time, frame))
+    
+    # 按时间排序
+    frame_time_pairs.sort(key=lambda x: x[0])
+    all_frames = [frame for _, frame in frame_time_pairs]
+    
+    print(f"Hybrid extraction: {base_frames} base + {action_frames_added} action = {len(all_frames)} total frames")
+    print(f"Video duration: {video_duration:.1f}s")
+    # print(f"number of all frames: {len(all_frames)}")
+    
+    return all_frames
