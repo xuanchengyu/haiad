@@ -31,6 +31,25 @@
               </span>
             </div>
           </div>
+          
+          <!-- 新增：视频背景信息输入框 -->
+          <div class="video-context-section" v-if="selectedFile">
+            <label for="videoContext" class="context-label">
+              <i class="fas fa-info-circle"></i>
+              Video Context (Optional)
+            </label>
+            <textarea 
+              id="videoContext"
+              v-model="videoContext"
+              placeholder="For example: This is a funny video about a cat, the main character is a orange cat."
+              class="context-input"
+              rows="3"
+            ></textarea>
+            <small class="context-hint">
+              Adding video context can help AI generate more accurate descriptions
+            </small>
+          </div>
+          
           <button 
             @click="uploadVideo" 
             :disabled="!selectedFile || isUploading"
@@ -112,6 +131,7 @@ export default {
       error: null,
       isUploading: false,
       isDragging: false,
+      videoContext: '',  // 新增：视频背景信息
       defaultThumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIzMjAiIGhlaWdodD0iMTgwIiBmaWxsPSIjZjBmMGYwIi8+CiAgICA8Y2lyY2xlIGN4PSIxNjAiIGN5PSI5MCIgcj0iNDAiIGZpbGw9IiNkZGQiLz4KICAgIDxwYXRoIGQ9Ik0xNDUgNzBMMTg1IDkwTDE0NSAxMTBaIiBmaWxsPSIjZmZmIi8+CiAgICA8dGV4dCB4PSIxNjAiIHk9IjE0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiIgZm9udC1zaXplPSIxNCI+5peg57uY5Yi2PC90ZXh0Pgo8L3N2Zz4='
     }
   },
@@ -187,6 +207,7 @@ export default {
       
       const formData = new FormData();
       formData.append('video', this.selectedFile);
+      formData.append('video_context', this.videoContext);  // 新增：添加视频背景信息
       
       this.isUploading = true;
       try {
@@ -210,6 +231,7 @@ export default {
           if (response.data.success) {
             ElMessage.success('Upload Success');
             this.selectedFile = null;
+            this.videoContext = '';  // 新增：清空视频背景信息
             const fileInput = this.$refs.fileInput;
             if (fileInput) fileInput.value = '';
             await this.fetchVideos();
@@ -396,6 +418,54 @@ export default {
 
 .upload-btn:hover:not(:disabled) {
   background-color: #45a049;
+}
+
+/* 新增：视频背景信息样式 */
+.video-context-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.context-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+.context-label i {
+  color: #4CAF50;
+}
+
+.context-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.3s;
+}
+
+.context-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.context-hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #6c757d;
+  font-style: italic;
 }
 
 .videos-section {

@@ -29,7 +29,7 @@ import hashlib
 from datetime import datetime, timezone
 
 os.environ["SB_DISABLE_QUIRKS"] = "disable_jit_profiling,allow_tf32"
-from .video_analysis import generate_clip_description, split_video_segment, generate_script_2, generate_script_with_instruction, frame_number
+from video_analysis import generate_clip_description, split_video_segment, generate_script_2, generate_script_with_instruction
 
 # =====================================
 
@@ -301,6 +301,9 @@ def upload_video(current_user):
         if file.filename == '':
             return jsonify({'error': '没有选择文件'}), 400
             
+        # 获取视频背景信息
+        video_context = request.form.get('video_context', '')
+        
         # 检查文件大小
         file.seek(0, 2)  # 移动到文件末尾
         size = file.tell()  # 获取文件大小
@@ -316,6 +319,7 @@ def upload_video(current_user):
             # 确保文件名不会重复.mp4
             filename = secure_filename(file.filename)
             print(f"开始上传文件: {filename}")  # 添加日志
+            print(f"视频背景信息: {video_context}")  # 新增：打印背景信息
             
             try:
                 # 生成存储路径
@@ -338,7 +342,8 @@ def upload_video(current_user):
                     'created_at': datetime.now(UTC),
                     'has_script': False,
                     'r2_storage_path': upload_result['storage_path'],
-                    'r2_url': upload_result['cdn_url']
+                    'r2_url': upload_result['cdn_url'],
+                    'video_context': video_context  # 新增：保存视频背景信息
                 }).inserted_id
 
                 # 生成缩略图
@@ -1042,6 +1047,7 @@ def generate_scene_description(current_user):
         start_time = data.get('start_time')
         end_time = data.get('end_time')
         creativity = data.get('creativity')
+        video_context = data.get('video_context', '')  # 新增：获取视频背景信息
         try:
             creativity = float(creativity)
         except Exception:
@@ -1053,7 +1059,8 @@ def generate_scene_description(current_user):
         'video_id': data.get('video_id'),
         'start_time': data.get('start_time'),
         'end_time': data.get('end_time'),
-        'creativity': data.get('creativity')})
+        'creativity': data.get('creativity'),
+        'video_context': data.get('video_context')})
 
         if not video_id:
             return jsonify({'error': 'Video ID not provided'}), 400
@@ -1075,6 +1082,9 @@ def generate_scene_description(current_user):
         if 'r2_url' not in video:
             return jsonify({'error': 'Video URL not found'}), 404
             
+        # 获取视频背景信息
+        video_context = video.get('video_context', '')
+
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
         os.makedirs(user_temp_dir, exist_ok=True)
@@ -1094,10 +1104,10 @@ def generate_scene_description(current_user):
             if not clip_path:
                 return jsonify({'error': 'Failed to split video segment'}), 500
 
-            num_frames = frame_number(start_time, end_time)
-            print("num_frames是",num_frames)
+            # num_frames = frame_number(start_time, end_time)
+            # print("num_frames是",num_frames)
             # transcript = speech_recognition(clip_path)
-            clip_description = generate_clip_description(clip_path, creativity, num_frames=num_frames)
+            clip_description = generate_clip_description(clip_path, creativity, video_context=video_context)
             # if transcript:
             #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
             script_array = generate_script_2(clip_description)
@@ -1263,6 +1273,9 @@ def generate_scene_description2(current_user):
         if 'r2_url' not in video:
             return jsonify({'error': 'Video URL not found'}), 404
             
+        # 获取视频背景信息
+        video_context = video.get('video_context', '')
+
         # 创建临时目录
         user_temp_dir = os.path.join(tempfile.gettempdir(), f"user_{str(current_user['_id'])}")
         os.makedirs(user_temp_dir, exist_ok=True)
@@ -1280,10 +1293,10 @@ def generate_scene_description2(current_user):
             if not clip_path:
                 return jsonify({'error': 'Failed to split video segment'}), 500
             
-            num_frames = frame_number(start_time, end_time)
-            print("num_frames是",num_frames)
+            # num_frames = frame_number(start_time, end_time)
+            # print("num_frames是",num_frames)
             # transcript = speech_recognition(clip_path) 
-            clip_description = generate_clip_description(clip_path, creativity, num_frames=num_frames)
+            clip_description = generate_clip_description(clip_path, creativity, video_context=video_context)
             # if transcript:
             #     clip_descriptions = clip_descriptions + f'\n\n ASR:{transcript}'
             script_array = generate_script_with_instruction(clip_description,selected_keywords,additional_instructions)
@@ -1397,6 +1410,6 @@ def generate_scene_description2(current_user):
 
 
 
-# if __name__ == '__main__':
-#     port = int(os.environ.get('PORT', 5002))
-#     app.run(host='0.0.0.0', port=port, debug=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5002))
+    app.run(host='0.0.0.0', port=port, debug=True)

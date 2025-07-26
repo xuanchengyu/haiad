@@ -107,7 +107,7 @@ def split_video_segment(video_path, start_time, end_time, output_dir):
 
 # 1. 用AI生成音频描述
 # 杨瑞霞修改代码
-def generate_clip_description(clip_path, creativity, num_frames=2, max_retries=100):
+def generate_clip_description(clip_path, creativity, max_retries=100, video_context=""):
     def call_with_limit(content, max_retries):
         attempt = 0
         while attempt < max_retries:
@@ -134,33 +134,30 @@ def generate_clip_description(clip_path, creativity, num_frames=2, max_retries=1
     try:
         descriptions = []
         clip = VideoFileClip(clip_path)
-        frames = sample_frames(clip, num_frames)
+        # 使用场景检测的关键帧提取（无需指定帧数）
+        frames = scene_based_keyframe_extraction(clip)
         images = [Image.fromarray(frame) for frame in frames]
         image_files = [convert_to_base64(image) for image in images]
 
         content = []
-        # prompt = ("You are an expert in understanding scene transitions based on visual features in a video. "
-        #           "For the given sequence of images per timestamp, identify different scenes in the video. "
-        #           "Generate pure audio description for each scene with time ranges.\n"
-        # )
-        # prompt = (
-        #     "You are an expert in analyzing video scenes. "
-        #     "Please analyze the provided images and describe what you see in the scene. "
-        #     "Write a clear, coherent description in English only as a single paragraph. "
-        #     "Focus on the visual elements, actions, and atmosphere. "
-        #     "Keep your response concise and well-structured, and avoid unnecessary line breaks or formatting. "
-        #     "Do not include any code formatting, special characters, or non-English text.\n"
-        # )
-
+        
+        # 基础prompt
         prompt = (
-            "You are an expert in analyzing video scenes "
+            "You are an expert in understanding scene transitions based on visual features in a video. "
             "Given a sequence of video keyframes with timestamps, identify different scenes in the video. "
-            "For each identified scene, generate a description summarising what happens in that scene.\n\n"
-    
-            "Please return the description for each sceneas a Python List of dictionaries, where each dictionary contains: \n"
+            "For each identified scene, provide a pure audio description in one short sentence. "
+            "Only describe what you can actually see in the frames. Avoid subjective analysis.\n\n"
+        )
+        
+        # 如果有视频背景信息，添加到prompt中
+        if video_context:
+            prompt += f"Video Context: {video_context}\n\n"
+        
+        prompt += (
+            "Please return the description for each scene as a Python List of dictionaries, where each dictionary contains: \n"
             "{time_range (str), description (str)}\n\n"
             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
-)
+        )
 
         content.append({"type": "text", "text": prompt})
         for image_file in image_files:
@@ -236,7 +233,7 @@ def generate_script_2(clip_descriptions, max_retries=100):
             "You are an expert at writing audio descriptions (AD) for video clips. "
             
             "Below is a list of short AD snippets covering different time ranges within the same video clip. "
-            "Your task is to synthesize these fragmented descriptions and rewrite them into a coherent AD of the entire clip, in 3 different writing styles.\n\n"
+            "Your task is to synthesize and generate a full and coherent AD of the entire clip, in 3 different writing styles.\n\n"
 
             "The three styles are:\n"
             "1. Objective - factual and straightforward\n"
@@ -244,6 +241,7 @@ def generate_script_2(clip_descriptions, max_retries=100):
             "3. Child-Friendly - simple and easy to understand\n\n"
             
             "For each style, return a well-structured description composed of several short sentences. "
+            "Focus on key actions and objects. Avoid subjective analysis. "
             "Do not include any special characters, code formatting, or non-English text.\n\n"
 
             "Please return the 3 audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
@@ -373,10 +371,11 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
             "You are an expert in writing high-quality audio descriptions (AD) for video clips. "
 
             "Below is a list of short AD snippets covering different time ranges within the same video clip. "
-            "Your task is to synthesize these fragmented descriptions and rewrite them into a coherent AD of the entire clip.\n\n"
+            "Your task is to synthesize and generate a full and coherent AD of the entire clip.\n\n"
 
             "You should rewrite them in 3 different versions based on the user-defined style and insructions."
             "For each version, return a well-structured description composed of several short sentences. "
+            "Focus on key actions and objects. Avoid subjective analysis. "
             "Do not include any special characters, code formatting, or non-English text.\n\n"
 
             "Please return the 3 versions ofaudio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
@@ -398,46 +397,192 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
         return []
 
 
-def frame_number(start_str, end_str):
+# def calculate_dynamic_frames(duration_seconds):
+#     """
+#     动态计算抽帧数量 - 每3秒1帧，无差别处理
+#     """
+#     duration = int(duration_seconds)
+    
+#     # 基础配置
+#     min_frames = 2
+#     max_frames = 60
+    
+#     # 处理不足3秒的情况
+#     if duration < 3:
+#         # 不足3秒的视频，至少抽2帧
+#         frames = min_frames
+#     else:
+#         # 每3秒1帧，无差别处理
+#         frames = duration // 3
+    
+#     # 确保不超过最大帧数
+#     return min(frames, max_frames)
+
+# def frame_number(start_str, end_str):
+#     """
+#     计算两个时间字符串的差值，返回 FFmpeg 兼容的 HH:MM:SS.mmm 格式
+#     参数示例：
+#         start_str = "00:00:01.001"
+#         end_str   = "00:00:02.000"
+#     返回："00:00:00.999"
+#     """
+#     try:
+#         # Ensure inputs are strings
+#         print("开始时间原始:",start_str)
+#         print("开始时间原始类型:",type(start_str))
+#         start_str = str(start_str)
+#         end_str = str(end_str)
+#         print("开始时间:",start_str)
+#         print("开始时间类型:",type(start_str))
+#         # 解析时间字符串（支持毫秒）
+#         fmt = "%H:%M:%S.%f"
+#         start = datetime.strptime(start_str, fmt)
+#         end = datetime.strptime(end_str, fmt)
+        
+#         # 计算时间差（微秒级）
+#         delta = end - start
+#         total_microseconds = delta.total_seconds() * 1_000_000
+#         seconds_tuple = divmod(total_microseconds, 1_000_000)
+#         seconds = seconds_tuple[0]  # 只取秒数部分
+        
+#         # 使用动态计算
+#         num_frames = calculate_dynamic_frames(seconds)
+#         print(f"视频时长: {seconds}秒, 抽帧数: {num_frames}")
+#         return num_frames
+    
+#     except ValueError as e:
+#         # print(f"时间格式错误: {str(e)}")
+#         return 2
+
+def scene_based_keyframe_extraction(video_clip):
     """
-    计算两个时间字符串的差值，返回 FFmpeg 兼容的 HH:MM:SS.mmm 格式
-    参数示例：
-        start_str = "00:00:01.001"
-        end_str   = "00:00:02.000"
-    返回："00:00:00.999"
+    基于场景检测的关键帧提取 - 完全基于场景变化
     """
     try:
-        # Ensure inputs are strings
-        print("开始时间原始:",start_str)
-        print("开始时间原始类型:",type(start_str))
-        start_str = str(start_str)
-        end_str = str(end_str)
-        print("开始时间:",start_str)
-        print("开始时间类型:",type(start_str))
-        # 解析时间字符串（支持毫秒）
-        fmt = "%H:%M:%S.%f"
-        start = datetime.strptime(start_str, fmt)
-        end = datetime.strptime(end_str, fmt)
+        total_frames = int(video_clip.fps * video_clip.duration)
         
-        # 计算时间差（微秒级）
-        delta = end - start
-        total_microseconds = delta.total_seconds() * 1_000_000
-        seconds_tuple = divmod(total_microseconds, 1_000_000)
-        seconds = seconds_tuple[0]  # 只取秒数部分
+        # 检测场景变化点
+        scene_changes = detect_scene_changes_advanced(video_clip)
         
-        # 根据视频时长确定抽帧数量
-        duration = int(seconds)
-        if duration <= 10:
+        # 如果没有检测到场景变化，使用基础采样
+        if not scene_changes:
+            print("No scene changes detected, using basic sampling")
+            # 根据视频长度决定采样数量
+            if total_frames <= 100:
+                num_frames = 2
+            elif total_frames <= 500:
+                num_frames = 4
+            else:
+                num_frames = 6
+            return sample_frames(video_clip, num_frames)
+        
+        # 保留所有检测到的场景变化，不限制数量
+        print(f"Using all {len(scene_changes)} detected scene changes")
+        
+        # 基于场景变化点选择关键帧
+        keyframes = select_key_frames(video_clip, scene_changes)
+        
+        # 限制总帧数，避免过多
+        max_frames = 15  # 从10增加到15，允许更多帧
+        if len(keyframes) > max_frames:
+            # 均匀选择最重要的帧
+            step = len(keyframes) // max_frames
+            keyframes = [keyframes[i] for i in range(0, len(keyframes), step)][:max_frames]
+            print(f"Limited keyframes to {max_frames} most important ones")
+        
+        print(f"Scene-based keyframes: {keyframes} (total: {len(keyframes)})")
+        frames = [video_clip.get_frame(i / video_clip.fps) for i in keyframes]
+        return frames
+        
+    except Exception as e:
+        print(f"Scene-based keyframe extraction error: {str(e)}")
+        # 降级到基础采样
+        if total_frames <= 100:
             num_frames = 2
-        elif duration <= 30:
+        elif total_frames <= 500:
             num_frames = 4
-        elif duration <= 60:
-            num_frames = 6
         else:
-            num_frames = 10
-        # print("num_frames是",num_frames)
-        return num_frames
+            num_frames = 6
+        return sample_frames(video_clip, num_frames)
+
+def detect_scene_changes_advanced(video_clip, threshold=0.40, min_scene_length=60):
+    """
+    高级场景变化检测 - 降低密度，提高质量
+    """
+    try:
+        total_frames = int(video_clip.fps * video_clip.duration)
+        changes = []
+        
+        # 增加采样间隔，降低检测密度
+        step = max(1, min(25, total_frames // 100))  # 从15增加到25
+        
+        prev_frame = None
+        last_change = 0
+        
+        for i in range(0, total_frames, step):
+            current_frame = video_clip.get_frame(i / video_clip.fps)
+            
+            if prev_frame is not None:
+                # 计算帧间差异
+                diff = np.mean(np.abs(current_frame - prev_frame))
+                
+                # 提高阈值，增加最小场景长度，减少误检
+                if diff > threshold * 255 and (i - last_change) >= min_scene_length:
+                    changes.append(i)
+                    last_change = i
+            
+            prev_frame = current_frame
+        
+        print(f"Detected {len(changes)} scene changes at frames: {changes}")
+        return changes
+        
+    except Exception as e:
+        print(f"Advanced scene change detection error: {str(e)}")
+        return []
+
+def select_key_frames(video_clip, scene_changes):
+    """
+    选择更关键的帧 - 基于动作和变化的重要性
+    """
+    key_frames = []
+    total_frames = int(video_clip.fps * video_clip.duration)
     
-    except ValueError as e:
-        # print(f"时间格式错误: {str(e)}")
-        return 2
+    # 添加起始帧
+    key_frames.append(0)
+    
+    for change_frame in scene_changes:
+        # 在场景变化点附近选择最关键的帧
+        start_search = max(0, change_frame - 20)
+        end_search = min(total_frames - 1, change_frame + 20)
+        
+        best_frame = change_frame
+        max_importance = 0
+        
+        # 在变化点前后20帧内寻找最关键的帧
+        for i in range(start_search, end_search + 1, 5):  # 每5帧检查一次
+            if i >= total_frames:
+                break
+                
+            current_frame = video_clip.get_frame(i / video_clip.fps)
+            
+            # 计算帧的重要性（基于与前后帧的差异）
+            importance = 0
+            if i > 0:
+                prev_frame = video_clip.get_frame((i - 5) / video_clip.fps)
+                importance += np.mean(np.abs(current_frame - prev_frame))
+            
+            if i < total_frames - 1:
+                next_frame = video_clip.get_frame((i + 5) / video_clip.fps)
+                importance += np.mean(np.abs(current_frame - next_frame))
+            
+            # 选择重要性最高的帧
+            if importance > max_importance:
+                max_importance = importance
+                best_frame = i
+        
+        key_frames.append(best_frame)
+    
+    # 添加结束帧
+    key_frames.append(total_frames - 1)
+    
+    return sorted(list(set(key_frames)))
