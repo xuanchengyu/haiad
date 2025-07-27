@@ -159,7 +159,7 @@ def generate_clip_description(clip_path, creativity, max_retries=100, video_cont
             "You are an expert in understanding scene transitions based on visual features in a video. "
             "Given a sequence of video keyframes with timestamps, identify different scenes in the video. "
             "For each identified scene, provide a pure audio description in one short sentence. "
-            "Only describe what you can actually see in the frames. Avoid subjective analysis.\n\n"
+            "Focus on describing the characters,actions, objects and text in the scenes. Avoid subjective analysis.\n\n"
 
             "Please return the description for each scene as a Python List of dictionaries, where each dictionary contains: \n"
             "{time_range (str), description (str)}\n\n"
@@ -184,8 +184,8 @@ def generate_clip_description(clip_path, creativity, max_retries=100, video_cont
 
     except Exception as e:
         print(f"Generate clip description error: {str(e)}")
-        # 返回一个有效的列表格式
-        return ["Error: Cannot generate scene description."]
+        # 返回一个有效的字符串格式
+        return "Error: Cannot generate scene description."
 
 
 # 2.1 用AI根据音频描述，生成五条最终描述(Request AI description页面)
@@ -386,10 +386,10 @@ def generate_script_with_instruction(clip_descriptions, selected_keywords, addit
             "Your task is to synthesize all the AD snippets and generate a full and coherent AD of the entire clip.\n\n"
 
             "You should rewrite them in 3 different versions based on the user-defined style and insructions."
-            "For each version, return a well-structured description composed of several short sentences. "
+            "For each version, return a well-structured description composed of several short sentences synthesizing all the AD snippets."
             "Do not include any special characters, code formatting, or non-English text.\n\n"
 
-            "Please return the 3 versions ofaudio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
+            "Please return the 3 versions of audio descriptions as a Python List of dictionaries, where each dictionary contains: \n"
             "{description_number (str), description (str)}\n\n"
             "Please return the Python List of dictionaries as the final output and do not add any additional information. \n\n"
     )

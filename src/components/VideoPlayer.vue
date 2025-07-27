@@ -77,7 +77,10 @@ export default {
       animationFrameId: null,
       copied: false,
       copyTimeout: null,
-      isPlayerActive: false // 新增：播放器激活状态
+      isPlayerActive: false, // 新增：播放器激活状态
+      playPromise: null, // 新增：播放Promise
+      isPlayRequestPending: false, // 新增：播放请求状态
+      playDebounceTimer: null // 新增：播放防抖定时器
     }
   },
   computed: {
@@ -122,21 +125,58 @@ export default {
     },
 
     setupEventListeners() {
-      this.player.on('play', () => this.isPlaying = true);
-      this.player.on('pause', () => this.isPlaying = false);
+      this.player.on('play', () => {
+        this.isPlaying = true;
+        this.isPlayRequestPending = false;
+      });
+      this.player.on('pause', () => {
+        this.isPlaying = false;
+        this.isPlayRequestPending = false;
+      });
       this.player.on('timeupdate', () => this.updateTimeDisplay());
       this.player.on('durationchange', () => this.updateTimeDisplay());
+      
+      // 监听播放错误
+      this.player.on('error', (error) => {
+        console.error('Video player error:', error);
+        this.isPlayRequestPending = false;
+      });
       
       // 监听全屏变化
       document.addEventListener('fullscreenchange', this.handleFullscreenChange);
     },
 
-    togglePlay() {
-      if (this.isPlaying) {
-        this.player.pause();
-      } else {
-        this.player.play();
+    async togglePlay() {
+      if (!this.player) return;
+      
+      // 防抖处理
+      if (this.playDebounceTimer) {
+        clearTimeout(this.playDebounceTimer);
       }
+      
+      this.playDebounceTimer = setTimeout(async () => {
+        try {
+          if (this.isPlaying) {
+            // 暂停播放
+            this.player.pause();
+          } else {
+            // 播放视频
+            if (this.isPlayRequestPending) return; // 防止重复请求
+            
+            this.isPlayRequestPending = true;
+            this.playPromise = this.player.play();
+            
+            await this.playPromise;
+          }
+        } catch (error) {
+          console.error('Play/Pause error:', error);
+          this.isPlayRequestPending = false;
+          // 忽略播放被中断的错误
+          if (error.name !== 'AbortError') {
+            console.warn('Video play/pause interrupted:', error.message);
+          }
+        }
+      }, 50); // 50ms 防抖延迟
     },
 
     skipForward(seconds) {
@@ -248,7 +288,21 @@ export default {
 
           const duration = this.player.duration();
           const targetTime = Math.max(0, Math.min(parsedTime, duration));
+          
+          // 如果正在播放，先暂停再跳转
+          const wasPlaying = this.isPlaying;
+          if (wasPlaying) {
+            this.player.pause();
+          }
+          
           this.player.currentTime(targetTime);
+          
+          // 如果之前在播放，恢复播放
+          if (wasPlaying && !this.isPlayRequestPending) {
+            setTimeout(() => {
+              this.togglePlay();
+            }, 50);
+          }
         } catch (error) {
           console.error('Jump to specified time failed:', error);
         }
@@ -275,21 +329,63 @@ export default {
 
     playSegment(start, end) {
       if (!this.player) return;
+      
       const startSec = this.parseTime(start);
       const endSec = this.parseTime(end);
       if (isNaN(startSec) || isNaN(endSec) || endSec <= startSec) return;
-      this.player.currentTime(startSec);
-      this.player.play();
+      
+      // 清除之前的定时器
       if (this._segmentInterval) {
         clearInterval(this._segmentInterval);
+        this._segmentInterval = null;
       }
-      this._segmentInterval = setInterval(() => {
-        if (this.player.currentTime() >= endSec) {
-          this.player.pause();
-          clearInterval(this._segmentInterval);
-          this._segmentInterval = null;
+      
+      // 防抖处理
+      if (this.playDebounceTimer) {
+        clearTimeout(this.playDebounceTimer);
+      }
+      
+      this.playDebounceTimer = setTimeout(() => {
+        // 保存结束时间
+        this._segmentEnd = end;
+        
+        // 设置时间并播放
+        this.player.currentTime(startSec);
+        
+        // 使用防抖的播放方法
+        this.playSegmentWithRetry();
+      }, 100); // 100ms 防抖延迟
+    },
+
+    async playSegmentWithRetry() {
+      if (!this.player) return;
+      
+      try {
+        if (this.isPlayRequestPending) return;
+        
+        this.isPlayRequestPending = true;
+        this.playPromise = this.player.play();
+        await this.playPromise;
+        
+        // 设置检查点
+        this._segmentInterval = setInterval(() => {
+          if (this.player && this.player.currentTime() >= this.parseTime(this._segmentEnd)) {
+            this.player.pause();
+            clearInterval(this._segmentInterval);
+            this._segmentInterval = null;
+          }
+        }, 100);
+        
+      } catch (error) {
+        console.error('Play segment error:', error);
+        this.isPlayRequestPending = false;
+        // 如果是播放被中断，尝试重试
+        if (error.name === 'AbortError') {
+          setTimeout(() => {
+            this.playSegmentWithRetry();
+          }, 100);
         }
-      }, 100);
+      }
     },
 
     handleKeydown(e) {
@@ -323,6 +419,17 @@ export default {
       cancelAnimationFrame(this.animationFrameId);
     }
     document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
+    
+    // 清理播放相关状态
+    this.isPlayRequestPending = false;
+    this.playPromise = null;
+    
+    // 清理防抖定时器
+    if (this.playDebounceTimer) {
+      clearTimeout(this.playDebounceTimer);
+      this.playDebounceTimer = null;
+    }
+    
     if (this.player) {
       this.player.dispose();
     }
