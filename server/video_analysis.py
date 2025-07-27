@@ -29,7 +29,19 @@ def sample_frames(video_clip, num_frames):
     try:
         total_frames = int(video_clip.fps * video_clip.duration)
         frame_indices = np.linspace(0, total_frames - 1, num_frames, dtype=int)
-        frames = [video_clip.get_frame(i / video_clip.fps) for i in frame_indices]
+        
+        frames = []
+        for i in frame_indices:
+            try:
+                # 确保帧索引在有效范围内
+                if i < 0 or i >= total_frames:
+                    continue
+                frame = video_clip.get_frame(i / video_clip.fps)
+                frames.append(frame)
+            except Exception as e:
+                print(f"Error reading frame {i}: {str(e)}")
+                continue
+        
         return frames
     except Exception as e:
         print(f"Frame sampling error: {str(e)}")
@@ -403,16 +415,14 @@ def calculate_dynamic_frames(duration_seconds):
     duration = int(duration_seconds)
     
     # 基础配置
-    min_frames = 2
     max_frames = 60
     
-    # 处理不足3秒的情况
-    if duration < 3:
-        # 不足3秒的视频，至少抽2帧
-        frames = min_frames
-    else:
-        # 每3秒1帧，无差别处理
-        frames = duration // 3
+
+    # 每3秒1帧，无差别处理
+    frames = duration // 3
+    # 确保短视频有足够的基础帧
+    if frames < 2:
+        frames = 2
     
     # 确保不超过最大帧数
     return min(frames, max_frames)
@@ -529,21 +539,28 @@ def hybrid_frame_extraction(video_clip):
             # 计算与前后帧的差异（动作强度）
             action_score = 0
             if i > 0:
-                prev_idx = i - 5
+                prev_idx = max(0, i - 5)  # 确保不超出范围
                 if prev_idx not in frame_cache:
-                    frame_cache[prev_idx] = video_clip.get_frame(prev_idx / video_clip.fps)
+                    try:
+                        frame_cache[prev_idx] = video_clip.get_frame(prev_idx / video_clip.fps)
+                    except:
+                        continue
                 prev_frame = frame_cache[prev_idx]
                 action_score += np.mean(np.abs(current_frame - prev_frame))
             
             if i < total_frames - 1:
-                next_idx = i + 5
+                next_idx = min(total_frames - 1, i + 5)  # 确保不超出范围
                 if next_idx not in frame_cache:
-                    frame_cache[next_idx] = video_clip.get_frame(next_idx / video_clip.fps)
+                    try:
+                        frame_cache[next_idx] = video_clip.get_frame(next_idx / video_clip.fps)
+                    except:
+                        continue
                 next_frame = frame_cache[next_idx]
                 action_score += np.mean(np.abs(current_frame - next_frame))
             
             action_scores.append((i, action_score))
-        except:
+        except Exception as e:
+            print(f"Error processing frame {i}: {str(e)}")
             continue
     
     # 选择动作强度最高的帧
@@ -564,8 +581,8 @@ def hybrid_frame_extraction(video_clip):
     
     # 再添加动作帧（避免重复）
     action_frames_added = 0
-    max_action_frames = min(5, base_frames // 2)  # 增加动作帧数量，最多5个
-    # max_action_frames = 5
+    # 修复逻辑：确保至少有2个动作帧，最多5个
+    max_action_frames = max(2, min(5, base_frames // 2)) if base_frames > 1 else 2
     
     for frame_idx, score in action_scores:
         if action_frames_added >= max_action_frames:
@@ -582,6 +599,10 @@ def hybrid_frame_extraction(video_clip):
         
         if not is_duplicate:
             try:
+                # 确保帧索引在有效范围内
+                if frame_idx < 0 or frame_idx >= total_frames:
+                    continue
+                    
                 # 使用缓存的帧
                 if frame_idx in frame_cache:
                     frame = frame_cache[frame_idx]
