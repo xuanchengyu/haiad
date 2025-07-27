@@ -448,6 +448,9 @@ export default {
           this.isLoadingRequest = true; // 开始加载
           this.descriptions = []; // 清空之前的结果
 
+          // 在调用AI前强制保存当前场景
+          await this.forceSaveScene();
+
           const sceneData = this.$parent.$parent.scenes.find(s => s._id === this.sceneId);
           const response = await axios.post('/api/ai/scene/description', {
             video_id: this.videoId,
@@ -480,6 +483,9 @@ export default {
           this.isLoadingGenerate = true; // 开始加载
           this.descriptions_with_instru = []; // 清空之前的结果
 
+          // 在调用AI前强制保存当前场景
+          await this.forceSaveScene();
+
           const sceneData = this.$parent.$parent.scenes.find(s => s._id === this.sceneId);
           const response = await axios.post('/api/ai/scene/description2', {
             video_id: this.videoId,
@@ -505,7 +511,17 @@ export default {
         }finally {
     this.isLoadingGenerate = false; // 结束加载
   }
-},
+      },
+
+    // 强制保存场景方法
+    async forceSaveScene() {
+      this.$emit('force-save-scene', this.sceneId);
+      
+      // 等待保存完成
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      console.log('Force save completed');
+    },
 
 
   //   async sendMessage() {

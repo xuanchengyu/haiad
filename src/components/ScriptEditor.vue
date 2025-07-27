@@ -12,7 +12,7 @@
                 class="time-part"
                 maxlength="2"
                 v-model="scene.start_h"
-                @input="onTimeInput($event, scene, 'start', 0)"
+                @input="onTimeInput($event, scene, 'start', 0); scheduleAutoSave(scene)"
                 @keydown="onTimeKeydown($event, scene, 'start', 0)"
                 @paste="onTimePaste($event, scene, 'start')"
                 :ref="'start_h_' + scene._id"
@@ -22,7 +22,7 @@
                 class="time-part"
                 maxlength="2"
                 v-model="scene.start_m"
-                @input="onTimeInput($event, scene, 'start', 1)"
+                @input="onTimeInput($event, scene, 'start', 1); scheduleAutoSave(scene)"
                 @keydown="onTimeKeydown($event, scene, 'start', 1)"
                 :ref="'start_m_' + scene._id"
               />
@@ -31,7 +31,7 @@
                 class="time-part"
                 maxlength="2"
                 v-model="scene.start_s"
-                @input="onTimeInput($event, scene, 'start', 2)"
+                @input="onTimeInput($event, scene, 'start', 2); scheduleAutoSave(scene)"
                 @keydown="onTimeKeydown($event, scene, 'start', 2)"
                 :ref="'start_s_' + scene._id"
               />
@@ -40,7 +40,7 @@
                 class="time-part ms"
                 maxlength="3"
                 v-model="scene.start_ms"
-                @input="onTimeInput($event, scene, 'start', 3)"
+                @input="onTimeInput($event, scene, 'start', 3); scheduleAutoSave(scene)"
                 @keydown="onTimeKeydown($event, scene, 'start', 3)"
                 :ref="'start_ms_' + scene._id"
               />
@@ -51,7 +51,7 @@
                 class="time-part"
                 maxlength="2"
                 v-model="scene.end_h"
-                @input="onTimeInput($event, scene, 'end', 0)"
+                @input="onTimeInput($event, scene, 'end', 0); scheduleAutoSave(scene)"
                 @keydown="onTimeKeydown($event, scene, 'end', 0)"
                 @paste="onTimePaste($event, scene, 'end')"
                 :ref="'end_h_' + scene._id"
@@ -61,7 +61,7 @@
                 class="time-part"
                 maxlength="2"
                 v-model="scene.end_m"
-                @input="onTimeInput($event, scene, 'end', 1)"
+                @input="onTimeInput($event, scene, 'end', 1); scheduleAutoSave(scene)"
                 @keydown="onTimeKeydown($event, scene, 'end', 1)"
                 :ref="'end_m_' + scene._id"
               />
@@ -70,7 +70,7 @@
                 class="time-part"
                 maxlength="2"
                 v-model="scene.end_s"
-                @input="onTimeInput($event, scene, 'end', 2)"
+                @input="onTimeInput($event, scene, 'end', 2); scheduleAutoSave(scene)"
                 @keydown="onTimeKeydown($event, scene, 'end', 2)"
                 :ref="'end_s_' + scene._id"
               />
@@ -79,7 +79,7 @@
                 class="time-part ms"
                 maxlength="3"
                 v-model="scene.end_ms"
-                @input="onTimeInput($event, scene, 'end', 3)"
+                @input="onTimeInput($event, scene, 'end', 3); scheduleAutoSave(scene)"
                 @keydown="onTimeKeydown($event, scene, 'end', 3)"
                 :ref="'end_ms_' + scene._id"
               />
@@ -107,6 +107,8 @@
               :scene-id="scene._id"
               :current-text="scene.description"
               @select-description="handleDescriptionSelect"
+              @force-save-scene="handleForceSaveScene"
+              ref="toggleChat"
             />
           </div>
         </div>
@@ -116,6 +118,7 @@
             v-model="scene.description"
             class="scene-description"
             :placeholder="'Edit your script here...'"
+            @input="scheduleAutoSave(scene)"
           ></textarea>
           <div class="wpm-bottom">
             <span 
@@ -128,6 +131,7 @@
               <span class="material-icons wpm-icon">speed</span>
               {{ calculateSpeechRate(scene) }} wpm
             </span>
+
           </div>
         </div>
       </div>
@@ -165,7 +169,11 @@ export default {
       scenes: [],
       loading: false,
       error: null,
-      timeAllSelected: false // 标记是否全选
+      timeAllSelected: false, // 标记是否全选
+      // 自动保存相关
+      autoSaveTimer: null,
+      autoSaveDelay: 2000, // 2秒后自动保存
+      lastSavedData: null
     }
   },
   // mounted() {
@@ -199,30 +207,49 @@ export default {
       return parseInt(hours || 0) * 3600 + parseInt(minutes || 0) * 60 + parseInt(secs || 0) + parseInt(ms || 0) / 1000;
     },
 
-    handleDescriptionSelect(description, sceneId) {
-  const scene = this.scenes.find(s => s._id === sceneId);
-  if (scene) {
-        // 追加描述
-    if (scene.description) {
-      scene.description += '\n' + description;
-    } else {
-      scene.description = description;
+        handleDescriptionSelect(description, sceneId) {
+    const scene = this.scenes.find(s => s._id === sceneId);
+    if (scene) {
+          // 追加描述
+      if (scene.description) {
+        scene.description += '\n' + description;
+      } else {
+        scene.description = description;
+      }
+      
+          // // 计算语速（WPM）
+          // const wordCount = description.trim().split(/\s+/).length;
+          // const minutes = generationTime / (1000 * 60); // 毫秒转分钟
+          // const wpm = Math.round(wordCount / minutes);
+      
+          // // 更新场景的语速信息（如果需要保存）
+          // // 这里可以添加逻辑将wpm保存到场景对象中
+          
+          // ElMessage.success('Successfully added description!');
+          
+          // // 强制更新视图以显示新计算的语速
+          // this.$forceUpdate();
     }
-    
-        // // 计算语速（WPM）
-        // const wordCount = description.trim().split(/\s+/).length;
-        // const minutes = generationTime / (1000 * 60); // 毫秒转分钟
-        // const wpm = Math.round(wordCount / minutes);
-    
-        // // 更新场景的语速信息（如果需要保存）
-        // // 这里可以添加逻辑将wpm保存到场景对象中
+  },
+
+    // 处理强制保存场景
+    async handleForceSaveScene(sceneId) {
+      console.log('Force saving scene:', sceneId);
+      const scene = this.scenes.find(s => s._id === sceneId);
+      if (scene) {
+        // 清除自动保存定时器
+        if (this.autoSaveTimer) {
+          clearTimeout(this.autoSaveTimer);
+          this.autoSaveTimer = null;
+        }
         
-        // ElMessage.success('Successfully added description!');
+        // 直接调用updateScene方法强制保存
+        await this.updateScene(scene);
+        console.log('Scene force saved successfully');
         
-        // // 强制更新视图以显示新计算的语速
-        // this.$forceUpdate();
-  }
-},
+
+      }
+    },
     async addScene(sceneId, position) {
       try {
         const token = localStorage.getItem('token');
@@ -258,7 +285,25 @@ export default {
         );
         
         if (response.data.success) {
+          console.log('=== New scene added ===');
+          console.log('response.data.scene:', response.data.scene);
+          console.log('response.data.scene._id:', response.data.scene._id);
+          console.log('response.data.scene._id type:', typeof response.data.scene._id);
+          
           this.scenes.splice(insertIndex, 0, response.data.scene);
+          
+          console.log('=== Updated scenes array ===');
+          console.log('this.scenes:', this.scenes);
+          console.log('scenes with IDs:', this.scenes.map(s => ({ id: s._id, type: typeof s._id })));
+          
+          // 强制更新DOM，确保新场景的事件绑定正确
+          this.$nextTick(() => {
+            console.log('=== DOM updated, checking event bindings ===');
+            // 验证新场景的时间轴输入框是否存在
+            const newScene = this.scenes[insertIndex];
+            console.log('New scene in DOM:', newScene);
+          });
+          
           ElMessage.success('Insert success');
           this.$emit('update:script', this.scenes);
         } else {
@@ -275,6 +320,7 @@ export default {
     },
 
     async updateScene(scene) {
+      console.log('=== updateScene called ===');
       this.mergeTimeFields(scene);
       try {
         const token = localStorage.getItem('token');
@@ -300,7 +346,8 @@ export default {
         );
         
         if (response.data.success) {
-          ElMessage.success('Update success');
+          console.log('Update success for scene:', scene._id);
+          ElMessage.success('saved');
           this.$emit('update:script', this.scenes);
         } else {
           throw new Error(response.data.error || 'Update failed');
@@ -311,6 +358,73 @@ export default {
           this.$router.push('/login');
         } else {
           ElMessage.error(error.response?.data?.error || 'Update failed');
+        }
+      }
+    },
+
+    // 自动保存方法
+    scheduleAutoSave(scene) {
+      console.log('=== scheduleAutoSave triggered ===');
+      console.log('scene object:', scene);
+      console.log('scene._id:', scene._id);
+      console.log('scene._id type:', typeof scene._id);
+      console.log('scene description:', scene.description);
+      console.log('all scenes:', this.scenes.map(s => ({ id: s._id, desc: s.description })));
+      
+      // 验证场景对象
+      if (!scene || !scene._id) {
+        console.error('Invalid scene object:', scene);
+        return;
+      }
+      
+      // 清除之前的定时器
+      if (this.autoSaveTimer) {
+        clearTimeout(this.autoSaveTimer);
+      }
+      
+      // 设置新的自动保存定时器
+      this.autoSaveTimer = setTimeout(() => {
+        this.performAutoSave(scene);
+      }, this.autoSaveDelay);
+    },
+
+    async performAutoSave(scene) {
+      console.log('=== performAutoSave called ===');
+      this.mergeTimeFields(scene);
+      
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          this.$router.push('/login');
+          return;
+        }
+
+        const response = await axios.put(
+          `/api/videos/${this.videoId}/scenes/${scene._id}`,
+          {
+            scene_number: scene.scene_number,
+            start_time: scene.start_time,
+            end_time: scene.end_time,
+            description: scene.description
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (response.data.success) {
+          console.log('Auto save successful for scene:', scene._id);
+          this.lastSavedData = JSON.stringify(scene);
+        } else {
+          console.error('Auto save failed:', response.data.error);
+        }
+      } catch (error) {
+        console.error('Auto save failed:', error);
+        if (error.response?.status === 401) {
+          this.$router.push('/login');
         }
       }
     },
@@ -391,6 +505,12 @@ export default {
     //   }
     // }
     onTimeInput(e, scene, type, idx) {
+      console.log('=== onTimeInput triggered ===');
+      console.log('scene:', scene);
+      console.log('scene._id:', scene._id);
+      console.log('type:', type, 'idx:', idx);
+      console.log('event target value:', e.target.value);
+      
       const fields = [`${type}_h`, `${type}_m`, `${type}_s`, `${type}_ms`];
       let val = e.target.value.replace(/\D/g, '');
       if (idx < 3) val = val.slice(0, 2);
@@ -410,6 +530,8 @@ export default {
         } else if (refEl && refEl.focus) {
           refEl.focus();
         }
+        // 触发自动保存
+        this.scheduleAutoSave(scene);
         return;
       }
 
@@ -424,6 +546,9 @@ export default {
           }
         }
       }
+      
+      // 触发自动保存
+      this.scheduleAutoSave(scene);
     },
     onTimeKeydown(e, scene, type, idx) {
       const fields = [`${type}_h`, `${type}_m`, `${type}_s`, `${type}_ms`];
@@ -481,6 +606,13 @@ export default {
     },
   },
   
+  beforeUnmount() {
+    // 清理自动保存定时器
+    if (this.autoSaveTimer) {
+      clearTimeout(this.autoSaveTimer);
+    }
+  },
+  
   watch: {
     scriptData: {
       immediate: true,
@@ -518,6 +650,7 @@ export default {
   text-align: right;
   margin-top: 4px;
   min-height: 18px;
+  position: relative;
 }
 .wpm-icon-label {
   display: inline-flex;
@@ -757,6 +890,8 @@ export default {
 .play-btn .material-icons {
   font-size: 16px;
 }
+
+
 
 /* 响应式调整 */
 @media (max-width: 600px) {

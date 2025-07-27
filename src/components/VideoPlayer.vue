@@ -218,10 +218,17 @@ export default {
       try {
         const [hours, minutes, seconds] = timeStr.split(':');
         const [secs, ms] = (seconds || '0.0').split('.');
-        return parseInt(hours || 0) * 3600 + 
-               parseInt(minutes || 0) * 60 + 
-               parseInt(secs || 0) + 
-               parseInt(ms || 0) / 1000;
+        
+        // 更安全的毫秒处理，确保精度
+        const milliseconds = ms ? parseInt(ms) : 0;
+        
+        const result = parseInt(hours || 0) * 3600 + 
+                      parseInt(minutes || 0) * 60 + 
+                      parseInt(secs || 0) + 
+                      milliseconds / 1000;
+        
+        console.log('parseTime input:', timeStr, 'output:', result);
+        return result;
       } catch (error) {
         console.error('Time parsing failed:', error);
         return 0;
