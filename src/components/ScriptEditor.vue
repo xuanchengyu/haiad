@@ -588,6 +588,10 @@ export default {
         scene[`${type}_m`] = match[2];
         scene[`${type}_s`] = match[3];
         scene[`${type}_ms`] = match[4].padEnd(3, '0');
+        
+        // 触发自动保存
+        this.scheduleAutoSave(scene);
+        
         const refEl = this.$refs[`${type}_ms_${scene._id}`];
         if (Array.isArray(refEl)) {
           refEl[0] && refEl[0].focus && refEl[0].focus();
