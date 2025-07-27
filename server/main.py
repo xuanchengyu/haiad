@@ -1104,7 +1104,16 @@ def generate_scene_description(current_user):
             
             # 检查视频切片是否成功
             if not clip_path:
+                print(f"视频切片失败: start_time={start_time}, end_time={end_time}")
                 return jsonify({'error': 'Failed to split video segment'}), 500
+
+            # 验证切片文件是否存在
+            if not os.path.exists(clip_path):
+                print(f"切片文件不存在: {clip_path}")
+                return jsonify({'error': 'Video segment file not found'}), 500
+
+            print(f"切片文件验证成功: {clip_path}")
+            print(f"切片文件大小: {os.path.getsize(clip_path)} bytes")
 
             # num_frames = frame_number(start_time, end_time)
             # print("num_frames是",num_frames)
