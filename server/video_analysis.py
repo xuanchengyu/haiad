@@ -84,9 +84,9 @@ def split_video_segment(video_path, start_time, end_time, output_dir):
         print("时间差", time_duration)
         print("时间差的类型", type(time_duration))
         
-        # 修复文件名：将冒号替换为下划线，确保文件名兼容性
-        safe_start_time = start_time_str.replace(':', '_')
-        safe_end_time = end_time_str.replace(':', '_')
+        # 修复文件名：将冒号和点号替换为下划线，确保文件名兼容性
+        safe_start_time = start_time_str.replace(':', '_').replace('.', '_')
+        safe_end_time = end_time_str.replace(':', '_').replace('.', '_')
         clip_path = os.path.join(output_dir, f"clip_{safe_start_time}_{safe_end_time}.mp4")
         
         print(f"生成的文件路径: {clip_path}")
