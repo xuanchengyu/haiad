@@ -173,15 +173,22 @@ export default {
       // 自动保存相关
       autoSaveTimer: null,
       autoSaveDelay: 2000, // 2秒后自动保存
-      lastSavedData: null
+      lastSavedData: null,
+      // 调试相关
+      debugger: null
     }
   },
-  // mounted() {
-  //   console.log('ScriptEditor mounted with:', {
-  //     videoId: this.videoId,
-  //     scenes: this.scenes
-  //   });
-  // },
+  mounted() {
+    // 初始化调试工具
+    this.debugger = window.autoSaveDebugger;
+    if (this.debugger && this.debugger.log) {
+      this.debugger.log('ScriptEditor mounted', {
+        videoId: this.videoId,
+        mode: this.mode,
+        scenesCount: this.scenes.length
+      });
+    }
+  },
   methods: {
     calculateSpeechRate(scene) {
       // 计算时间差（秒）
@@ -371,9 +378,21 @@ export default {
       console.log('scene description:', scene.description);
       console.log('all scenes:', this.scenes.map(s => ({ id: s._id, desc: s.description })));
       
+      // 调试日志
+      if (this.debugger && this.debugger.log) {
+        this.debugger.log('Auto save scheduled', {
+          sceneId: scene._id,
+          description: scene.description?.substring(0, 100),
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       // 验证场景对象
       if (!scene || !scene._id) {
         console.error('Invalid scene object:', scene);
+              if (this.debugger && this.debugger.log) {
+        this.debugger.log('Invalid scene object', scene);
+      }
         return;
       }
       
@@ -390,6 +409,14 @@ export default {
 
     async performAutoSave(scene) {
       console.log('=== performAutoSave called ===');
+      
+      if (this.debugger && this.debugger.log) {
+        this.debugger.log('Auto save performing', {
+          sceneId: scene._id,
+          description: scene.description?.substring(0, 100)
+        });
+      }
+      
       this.mergeTimeFields(scene);
       
       try {
@@ -399,8 +426,10 @@ export default {
           return;
         }
 
+        // 添加缓存破坏参数，确保请求不被缓存
+        const timestamp = Date.now();
         const response = await axios.put(
-          `/api/videos/${this.videoId}/scenes/${scene._id}`,
+          `/api/videos/${this.videoId}/scenes/${scene._id}?_t=${timestamp}`,
           {
             scene_number: scene.scene_number,
             start_time: scene.start_time,
@@ -410,23 +439,107 @@ export default {
           {
             headers: {
               'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            },
+            // 添加超时设置
+            timeout: 10000
           }
         );
         
         if (response.data.success) {
           console.log('Auto save successful for scene:', scene._id);
           this.lastSavedData = JSON.stringify(scene);
+          
+          if (this.debugger && this.debugger.log) {
+            this.debugger.log('Auto save successful', {
+              sceneId: scene._id,
+              responseData: response.data
+            });
+          }
+          
+          // 添加成功提示（可选）
+          // ElMessage.success('Auto saved');
         } else {
           console.error('Auto save failed:', response.data.error);
+          if (this.debugger && this.debugger.log) {
+            this.debugger.log('Auto save failed', {
+              sceneId: scene._id,
+              error: response.data.error
+            });
+          }
+          // 如果自动保存失败，尝试重试
+          this.retryAutoSave(scene);
         }
       } catch (error) {
         console.error('Auto save failed:', error);
+        if (this.debugger && this.debugger.log) {
+          this.debugger.log('Auto save error', {
+            sceneId: scene._id,
+            error: error.message,
+            status: error.response?.status
+          });
+        }
         if (error.response?.status === 401) {
           this.$router.push('/login');
+        } else {
+          // 网络错误或其他错误，尝试重试
+          this.retryAutoSave(scene);
         }
       }
+    },
+
+    // 重试自动保存
+    async retryAutoSave(scene, retryCount = 0) {
+      const maxRetries = 3;
+      if (retryCount >= maxRetries) {
+        console.error('Auto save failed after max retries');
+        ElMessage.error('Auto save failed, please save manually');
+        return;
+      }
+
+      console.log(`Retrying auto save (${retryCount + 1}/${maxRetries})`);
+      
+      // 延迟重试
+      setTimeout(async () => {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) return;
+
+          const timestamp = Date.now();
+          const response = await axios.put(
+            `/api/videos/${this.videoId}/scenes/${scene._id}?_t=${timestamp}`,
+            {
+              scene_number: scene.scene_number,
+              start_time: scene.start_time,
+              end_time: scene.end_time,
+              description: scene.description
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+              },
+              timeout: 10000
+            }
+          );
+          
+          if (response.data.success) {
+            console.log('Retry auto save successful');
+            this.lastSavedData = JSON.stringify(scene);
+          } else {
+            this.retryAutoSave(scene, retryCount + 1);
+          }
+        } catch (error) {
+          console.error('Retry auto save failed:', error);
+          this.retryAutoSave(scene, retryCount + 1);
+        }
+      }, 2000 * (retryCount + 1)); // 递增延迟
     },
 
     async deleteScene(sceneId) {
