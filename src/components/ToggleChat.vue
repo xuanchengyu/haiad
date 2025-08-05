@@ -448,7 +448,9 @@ export default {
           this.isLoadingRequest = true; // 开始加载
           this.descriptions = []; // 清空之前的结果
 
-          // 直接获取当前场景数据，不进行强制保存
+          // 自动保存当前场景
+          await this.forceSaveScene();
+          
           const sceneData = this.$parent.$parent.scenes.find(s => s._id === this.sceneId);
           if (!sceneData) {
             throw new Error('Scene data not found. Please save your changes first.');
@@ -485,7 +487,9 @@ export default {
           this.isLoadingGenerate = true; // 开始加载
           this.descriptions_with_instru = []; // 清空之前的结果
 
-          // 直接获取当前场景数据，不进行强制保存
+          // 自动保存当前场景
+          await this.forceSaveScene();
+          
           const sceneData = this.$parent.$parent.scenes.find(s => s._id === this.sceneId);
           if (!sceneData) {
             throw new Error('Scene data not found. Please save your changes first.');
@@ -590,6 +594,13 @@ export default {
   //       this.isLoading = false;
   //     }
   //   }
+  // },
+
+    // 强制保存场景
+    async forceSaveScene() {
+      this.$emit('force-save-scene', this.sceneId);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
   }
 }
 </script>

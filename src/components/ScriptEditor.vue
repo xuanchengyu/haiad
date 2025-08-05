@@ -108,7 +108,7 @@
               :current-text="scene.description"
 
               @select-description="handleDescriptionSelect"
-
+              @force-save-scene="handleForceSaveScene"
               ref="toggleChat"
               :key="scene._id || 'temp-' + Math.random()"
             />
@@ -241,6 +241,23 @@ export default {
     }
   },
 
+    // 处理强制保存场景
+    async handleForceSaveScene(sceneId) {
+      const scene = this.scenes.find(s => s._id === sceneId);
+      if (scene) {
+        // 确保时间字段被正确合并
+        this.mergeTimeFields(scene);
+        
+        // 清除自动保存定时器
+        if (this.autoSaveTimer) {
+          clearTimeout(this.autoSaveTimer);
+          this.autoSaveTimer = null;
+        }
+        
+        // 直接调用updateScene方法强制保存
+        await this.updateScene(scene);
+      }
+    },
 
     async addScene(sceneId, position) {
       try {
