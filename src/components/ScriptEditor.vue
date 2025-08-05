@@ -104,11 +104,13 @@
             <ToggleChat 
               mode="collaborative"
               :video-id="videoId"
-              :scene-id="scene._id"
+              :scene-id="scene._id || ''"
               :current-text="scene.description"
+
               @select-description="handleDescriptionSelect"
-              @force-save-scene="handleForceSaveScene"
+
               ref="toggleChat"
+              :key="scene._id || 'temp-' + Math.random()"
             />
           </div>
         </div>
@@ -239,24 +241,7 @@ export default {
     }
   },
 
-    // 处理强制保存场景
-    async handleForceSaveScene(sceneId) {
-      console.log('Force saving scene:', sceneId);
-      const scene = this.scenes.find(s => s._id === sceneId);
-      if (scene) {
-        // 清除自动保存定时器
-        if (this.autoSaveTimer) {
-          clearTimeout(this.autoSaveTimer);
-          this.autoSaveTimer = null;
-        }
-        
-        // 直接调用updateScene方法强制保存
-        await this.updateScene(scene);
-        console.log('Scene force saved successfully');
-        
 
-      }
-    },
     async addScene(sceneId, position) {
       try {
         const token = localStorage.getItem('token');
@@ -388,11 +373,11 @@ export default {
       }
       
       // 验证场景对象
-      if (!scene || !scene._id) {
-        console.error('Invalid scene object:', scene);
-              if (this.debugger && this.debugger.log) {
-        this.debugger.log('Invalid scene object', scene);
-      }
+      if (!scene || !scene._id || scene._id === '') {
+        console.warn('Scene has no ID yet - skipping auto save for first edit');
+        if (this.debugger && this.debugger.log) {
+          this.debugger.log('Scene has no ID yet', scene);
+        }
         return;
       }
       
@@ -409,6 +394,12 @@ export default {
 
     async performAutoSave(scene) {
       console.log('=== performAutoSave called ===');
+      
+      // 再次验证场景对象
+      if (!scene || !scene._id || scene._id === '') {
+        console.error('Invalid scene object in performAutoSave:', scene);
+        return;
+      }
       
       if (this.debugger && this.debugger.log) {
         this.debugger.log('Auto save performing', {
@@ -752,7 +743,7 @@ export default {
               end_m: em || '00',
               end_s: es || '00',
               end_ms: ems || '000',
-              _id: scene._id || ''
+              _id: scene._id || null
             };
           });
         }
